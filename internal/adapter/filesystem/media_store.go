@@ -68,7 +68,7 @@ func (s *mediaStore) Get(_ context.Context, mediaID string) (io.ReadCloser, stri
 
 	stat, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, "", 0, fmt.Errorf("filesystem: stat file: %w", err)
 	}
 

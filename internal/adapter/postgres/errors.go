@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -21,22 +20,13 @@ func isInsufficientPrivilege(err error) bool {
 }
 
 func isUniqueViolation(err error) bool {
-	if pgErr, ok := err.(*pgconn.PgError); ok {
-		return pgErr.Code == pgErrUniqueViolation
-	}
-	return false
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgErrUniqueViolation
 }
 
 func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == pgErrForeignKeyViolation
-}
-
-func wrapErr(op string, err error) error {
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("postgres: %s: %w", op, err)
 }
 
 func nilIfEmpty(s string) *string {

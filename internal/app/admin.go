@@ -22,7 +22,7 @@ var ErrDependency = errors.New("dependency unavailable")
 func OpenAdmin(ctx context.Context, dsn, correlationID string) (in.AdminService, func(), error) {
 	pool, err := postgres.Open(ctx, dsn, 4)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: %v", ErrDependency, err)
+		return nil, nil, fmt.Errorf("%w: %w", ErrDependency, err)
 	}
 	svc := usecase.NewAdminService(usecase.AdminStores{
 		Namespaces:  postgres.NewNamespaceStore(pool),

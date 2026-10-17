@@ -67,7 +67,9 @@ func NewServer(
 ) *Server {
 	r := chi.NewRouter()
 	if opts.TrustProxyHeaders {
-		r.Use(chimiddleware.RealIP)
+		// Opt-in for deployments behind a proxy that sets X-Forwarded-For/X-Real-IP;
+		// without that proxy these headers are client-controlled.
+		r.Use(chimiddleware.RealIP) //nolint:staticcheck // SA1019: only used when the operator trusts its proxy
 	}
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.Recoverer)

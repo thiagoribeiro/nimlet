@@ -5,3 +5,19 @@ linters:
     - errorlint
     - misspell
     - bodyclose
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (net/http.ResponseWriter).Write
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      # Deferred Close errors on readers and connections carry no actionable information.
+      - linters: [errcheck]
+        source: "^\\s*defer .*\\.Close\\(\\)"
+      # Deprecated SDK APIs with planned migrations (aws transfermanager, oauth2 credentials).
+      - linters: [staticcheck]
+        text: "SA1019: .*(feature/s3/manager|CredentialsFromJSON)"

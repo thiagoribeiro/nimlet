@@ -52,7 +52,7 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 			}
 			// Not the client's fault: a 401 here would make every client discard its session
 			// during a database hiccup.
-			writeError(w, r, fmt.Errorf("auth: load session: %w: %v", errUnavailable, err))
+			writeError(w, r, fmt.Errorf("auth: load session: %w: %w", errUnavailable, err))
 			return
 		}
 		sess := &auth.Session

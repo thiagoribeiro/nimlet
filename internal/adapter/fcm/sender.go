@@ -42,7 +42,9 @@ func NewSender(ctx context.Context, credentialsFile string) (*Sender, error) {
 		return nil, fmt.Errorf("fcm: read credentials: %w", err)
 	}
 
-	creds, err := google.CredentialsFromJSON(ctx, raw, messagingScope)
+	// The type is pinned so a file of another credential type (for example an
+	// external account pointing at arbitrary URLs) is rejected.
+	creds, err := google.CredentialsFromJSONWithType(ctx, raw, google.ServiceAccount, messagingScope)
 	if err != nil {
 		return nil, fmt.Errorf("fcm: parse credentials: %w", err)
 	}

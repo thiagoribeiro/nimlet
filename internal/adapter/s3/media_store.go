@@ -7,7 +7,8 @@ import (
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
@@ -15,9 +16,12 @@ import (
 	"github.com/thiagoribeiro/nimlet/internal/port/out"
 )
 
+// minPartSize is S3's minimum multipart part size (5 MiB).
+const minPartSize = 5 * 1024 * 1024
+
 type mediaStore struct {
 	client   *s3.Client
-	uploader *manager.Uploader
+	uploader *transfermanager.Client
 	bucket   string
 }
 
@@ -28,9 +32,9 @@ func NewMediaStore(client *s3.Client, bucket string) out.MediaStore {
 		// cannot take that — it must hash or size a seekable body — so the upload manager
 		// sends it as a multipart upload, buffering one part at a time: memory per upload is
 		// PartSize × Concurrency (5 MiB × 2), whatever the file size.
-		uploader: manager.NewUploader(client, func(u *manager.Uploader) {
-			u.PartSize = manager.MinUploadPartSize
-			u.Concurrency = 2
+		uploader: transfermanager.New(client, func(o *transfermanager.Options) {
+			o.PartSizeBytes = minPartSize
+			o.Concurrency = 2
 		}),
 		bucket: bucket,
 	}
@@ -38,12 +42,12 @@ func NewMediaStore(client *s3.Client, bucket string) out.MediaStore {
 
 // Save streams r to S3 without buffering the whole body (see NewMediaStore).
 func (s *mediaStore) Save(ctx context.Context, mediaID, _, contentType string, r io.Reader) error {
-	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
+	_, err := s.uploader.UploadObject(ctx, &transfermanager.UploadObjectInput{
 		Bucket:      &s.bucket,
 		Key:         aws.String(mediaID),
 		Body:        r,
 		ContentType: aws.String(contentType),
-		ACL:         types.ObjectCannedACLPrivate,
+		ACL:         tmtypes.ObjectCannedACLPrivate,
 	})
 	if err != nil {
 		return fmt.Errorf("s3: put object %q: %w", mediaID, err)

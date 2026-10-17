@@ -18,6 +18,3 @@ linters:
       # Deferred Close errors on readers and connections carry no actionable information.
       - linters: [errcheck]
         source: "^\\s*defer .*\\.Close\\(\\)"
-      # Deprecated SDK APIs with planned migrations (aws transfermanager, oauth2 credentials).
-      - linters: [staticcheck]
-        text: "SA1019: .*(feature/s3/manager|CredentialsFromJSON)"

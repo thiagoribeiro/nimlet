@@ -1,0 +1,16 @@
+setup: 200 users joined room 847bdccc-e2ed-44a3-9bcd-ebd70335688f in 2.406s
+
+scenario: members=200 listeners=200 senders=10 rate=20/s duration=30s
+sent: 600 (20.0/s), send errors: 0, sync errors: 0, sync calls: 114700
+delivered: 120000 / 120000 expected (100.00%), duplicates: 0
+initial sync  n=200     p50=91.55ms    p95=130.58ms   p99=140.52ms   max=144.05ms
+send          n=600     p50=24.55ms    p95=41.41ms    p99=45.68ms    max=77.49ms
+delivery      n=120000  p50=46.6ms     p95=67.96ms    p99=77.35ms    max=142.11ms
+setup: 50 users joined room bf6bdc2a-44a4-442a-a663-bcbab839b7c5 in 699ms
+
+scenario: members=50 listeners=50 senders=5 rate=100/s duration=30s
+sent: 3000 (100.0/s), send errors: 0, sync errors: 0, sync calls: 89891
+delivered: 150000 / 150000 expected (100.00%), duplicates: 0
+initial sync  n=50      p50=8.67ms     p95=10.79ms    p99=11.42ms    max=11.42ms
+send          n=3000    p50=5.74ms     p95=13.77ms    p99=19.42ms    max=31.55ms
+delivery      n=150000  p50=16.12ms    p95=28.81ms    p99=33.39ms    max=49.92ms

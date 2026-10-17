@@ -1,0 +1,78 @@
+PREPARE
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     QUERY PLAN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=52.326..56.735 rows=100 loops=1)
+   Buffers: shared hit=792 read=4175 dirtied=3 written=2898
+   ->  Gather Merge (actual time=52.323..56.724 rows=100 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=792 read=4175 dirtied=3 written=2898
+         ->  Sort (actual time=40.190..40.201 rows=67 loops=3)
+               Sort Key: e.stream_pos
+               Sort Method: top-N heapsort  Memory: 50kB
+               Buffers: shared hit=792 read=4175 dirtied=3 written=2898
+               Worker 0:  Sort Method: top-N heapsort  Memory: 50kB
+               Worker 1:  Sort Method: top-N heapsort  Memory: 50kB
+               ->  Parallel Append (actual time=2.448..35.132 rows=33719 loops=3)
+                     Buffers: shared hit=792 read=4175 dirtied=3 written=2898
+                     ->  Nested Loop (actual time=0.768..41.917 rows=20000 loops=1)
+                           Buffers: shared hit=543 read=274 written=225
+                           ->  Merge Join (actual time=0.721..36.647 rows=20000 loops=1)
+                                 Merge Cond: (v.stream_pos = e.stream_pos)
+                                 Buffers: shared hit=540 read=273 written=225
+                                 ->  Merge Append (actual time=0.663..22.295 rows=20000 loops=1)
+                                       Sort Key: v.stream_pos
+                                       Buffers: shared hit=8 read=219 written=180
+                                       ->  Index Only Scan using event_visibility_p1_pkey on event_visibility_p1 v_1 (actual time=0.639..21.027 rows=20000 loops=1)
+                                             Index Cond: ((user_id = 'bench_7fd7cef2_4902'::text) AND (stream_pos > '0'::bigint))
+                                             Heap Fetches: 0
+                                             Buffers: shared hit=4 read=219 written=180
+                                       ->  Index Only Scan using event_visibility_p2_pkey on event_visibility_p2 v_2 (actual time=0.013..0.013 rows=0 loops=1)
+                                             Index Cond: ((user_id = 'bench_7fd7cef2_4902'::text) AND (stream_pos > '0'::bigint))
+                                             Heap Fetches: 0
+                                             Buffers: shared hit=2
+                                       ->  Index Only Scan using event_visibility_default_pkey on event_visibility_default v_3 (actual time=0.010..0.010 rows=0 loops=1)
+                                             Index Cond: ((user_id = 'bench_7fd7cef2_4902'::text) AND (stream_pos > '0'::bigint))
+                                             Heap Fetches: 0
+                                             Buffers: shared hit=2
+                                 ->  Merge Append (actual time=0.053..9.525 rows=20000 loops=1)
+                                       Sort Key: e.stream_pos
+                                       Buffers: shared hit=532 read=54 written=45
+                                       ->  Index Scan using events_p1_pkey on events_p1 e_1 (actual time=0.033..8.312 rows=20000 loops=1)
+                                             Buffers: shared hit=530 read=54 written=45
+                                       ->  Index Scan using events_p2_pkey on events_p2 e_2 (actual time=0.010..0.010 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                                       ->  Index Scan using events_default_pkey on events_default e_3 (actual time=0.010..0.010 rows=0 loops=1)
+                                             Buffers: shared hit=1
+                           ->  Memoize (actual time=0.000..0.000 rows=1 loops=20000)
+                                 Cache Key: e.sender_id
+                                 Cache Mode: logical
+                                 Buffers: shared hit=3 read=1
+                                 Worker 1:  Hits: 19999  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                                 ->  Index Scan using users_pkey on users u (actual time=0.036..0.036 rows=1 loops=1)
+                                       Index Cond: (id = e.sender_id)
+                                       Buffers: shared hit=3 read=1
+                     ->  Hash Join (actual time=3.286..28.903 rows=40578 loops=2)
+                           Hash Cond: (e_4.sender_id = u_1.id)
+                           Buffers: shared hit=249 read=3901 dirtied=3 written=2673
+                           ->  Parallel Append (actual time=1.665..22.395 rows=40578 loops=2)
+                                 Buffers: shared hit=110 read=3784 dirtied=3 written=2673
+                                 ->  Seq Scan on events_p2 e_6 (actual time=0.006..0.006 rows=0 loops=1)
+                                       Filter: ((stream_pos > '0'::bigint) AND (room_id = ANY ('{bench_7fd7cef2_large_0,bench_7fd7cef2_large_1,bench_7fd7cef2_large_2,bench_7fd7cef2_large_3,bench_7fd7cef2_large_4,bench_7fd7cef2_large_5,bench_7fd7cef2_large_6,bench_7fd7cef2_large_7,bench_7fd7cef2_large_8,bench_7fd7cef2_large_9,bench_7fd7cef2_large_10,bench_7fd7cef2_large_11,bench_7fd7cef2_large_12,bench_7fd7cef2_large_13,bench_7fd7cef2_large_14,bench_7fd7cef2_large_15,bench_7fd7cef2_large_16,bench_7fd7cef2_large_17,bench_7fd7cef2_large_18,bench_7fd7cef2_large_19,bench_7fd7cef2_large_20,bench_7fd7cef2_large_21,bench_7fd7cef2_large_22,bench_7fd7cef2_large_23,bench_7fd7cef2_large_24,bench_7fd7cef2_large_25,bench_7fd7cef2_large_26,bench_7fd7cef2_large_27,bench_7fd7cef2_large_28,bench_7fd7cef2_large_29,bench_7fd7cef2_large_30,bench_7fd7cef2_large_31,bench_7fd7cef2_large_32,bench_7fd7cef2_large_33,bench_7fd7cef2_large_34,bench_7fd7cef2_large_35,bench_7fd7cef2_large_36,bench_7fd7cef2_large_37,bench_7fd7cef2_large_38,bench_7fd7cef2_large_39,bench_7fd7cef2_large_40,bench_7fd7cef2_large_41,bench_7fd7cef2_large_42,bench_7fd7cef2_large_43,bench_7fd7cef2_large_44,bench_7fd7cef2_large_45,bench_7fd7cef2_large_46,bench_7fd7cef2_large_47,bench_7fd7cef2_large_48,bench_7fd7cef2_large_49}'::text[])))
+                                 ->  Seq Scan on events_default e_7 (actual time=0.004..0.004 rows=0 loops=1)
+                                       Filter: ((stream_pos > '0'::bigint) AND (room_id = ANY ('{bench_7fd7cef2_large_0,bench_7fd7cef2_large_1,bench_7fd7cef2_large_2,bench_7fd7cef2_large_3,bench_7fd7cef2_large_4,bench_7fd7cef2_large_5,bench_7fd7cef2_large_6,bench_7fd7cef2_large_7,bench_7fd7cef2_large_8,bench_7fd7cef2_large_9,bench_7fd7cef2_large_10,bench_7fd7cef2_large_11,bench_7fd7cef2_large_12,bench_7fd7cef2_large_13,bench_7fd7cef2_large_14,bench_7fd7cef2_large_15,bench_7fd7cef2_large_16,bench_7fd7cef2_large_17,bench_7fd7cef2_large_18,bench_7fd7cef2_large_19,bench_7fd7cef2_large_20,bench_7fd7cef2_large_21,bench_7fd7cef2_large_22,bench_7fd7cef2_large_23,bench_7fd7cef2_large_24,bench_7fd7cef2_large_25,bench_7fd7cef2_large_26,bench_7fd7cef2_large_27,bench_7fd7cef2_large_28,bench_7fd7cef2_large_29,bench_7fd7cef2_large_30,bench_7fd7cef2_large_31,bench_7fd7cef2_large_32,bench_7fd7cef2_large_33,bench_7fd7cef2_large_34,bench_7fd7cef2_large_35,bench_7fd7cef2_large_36,bench_7fd7cef2_large_37,bench_7fd7cef2_large_38,bench_7fd7cef2_large_39,bench_7fd7cef2_large_40,bench_7fd7cef2_large_41,bench_7fd7cef2_large_42,bench_7fd7cef2_large_43,bench_7fd7cef2_large_44,bench_7fd7cef2_large_45,bench_7fd7cef2_large_46,bench_7fd7cef2_large_47,bench_7fd7cef2_large_48,bench_7fd7cef2_large_49}'::text[])))
+                                 ->  Parallel Seq Scan on events_p1 e_5 (actual time=1.659..20.203 rows=40578 loops=2)
+                                       Filter: ((stream_pos > '0'::bigint) AND (room_id = ANY ('{bench_7fd7cef2_large_0,bench_7fd7cef2_large_1,bench_7fd7cef2_large_2,bench_7fd7cef2_large_3,bench_7fd7cef2_large_4,bench_7fd7cef2_large_5,bench_7fd7cef2_large_6,bench_7fd7cef2_large_7,bench_7fd7cef2_large_8,bench_7fd7cef2_large_9,bench_7fd7cef2_large_10,bench_7fd7cef2_large_11,bench_7fd7cef2_large_12,bench_7fd7cef2_large_13,bench_7fd7cef2_large_14,bench_7fd7cef2_large_15,bench_7fd7cef2_large_16,bench_7fd7cef2_large_17,bench_7fd7cef2_large_18,bench_7fd7cef2_large_19,bench_7fd7cef2_large_20,bench_7fd7cef2_large_21,bench_7fd7cef2_large_22,bench_7fd7cef2_large_23,bench_7fd7cef2_large_24,bench_7fd7cef2_large_25,bench_7fd7cef2_large_26,bench_7fd7cef2_large_27,bench_7fd7cef2_large_28,bench_7fd7cef2_large_29,bench_7fd7cef2_large_30,bench_7fd7cef2_large_31,bench_7fd7cef2_large_32,bench_7fd7cef2_large_33,bench_7fd7cef2_large_34,bench_7fd7cef2_large_35,bench_7fd7cef2_large_36,bench_7fd7cef2_large_37,bench_7fd7cef2_large_38,bench_7fd7cef2_large_39,bench_7fd7cef2_large_40,bench_7fd7cef2_large_41,bench_7fd7cef2_large_42,bench_7fd7cef2_large_43,bench_7fd7cef2_large_44,bench_7fd7cef2_large_45,bench_7fd7cef2_large_46,bench_7fd7cef2_large_47,bench_7fd7cef2_large_48,bench_7fd7cef2_large_49}'::text[])))
+                                       Rows Removed by Filter: 30361
+                                       Buffers: shared hit=110 read=3784 dirtied=3 written=2673
+                           ->  Hash (actual time=1.540..1.541 rows=6700 loops=2)
+                                 Buckets: 8192  Batches: 1  Memory Usage: 486kB
+                                 Buffers: shared hit=121 read=117
+                                 ->  Seq Scan on users u_1 (actual time=0.009..0.817 rows=6700 loops=2)
+                                       Buffers: shared hit=121 read=117
+ Planning:
+   Buffers: shared hit=759 read=28
+ Planning Time: 3.958 ms
+ Execution Time: 56.966 ms
+(73 rows)
+

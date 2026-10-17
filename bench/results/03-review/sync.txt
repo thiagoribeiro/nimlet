@@ -1,0 +1,54 @@
+goos: linux
+goarch: amd64
+pkg: github.com/thiagoribeiro/nimlet/internal/sync
+cpu: AMD Ryzen AI 5 330 w/ Radeon 820M
+BenchmarkRegistry_Churn/waiters=10-8     	 1558360	       232.1 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10-8     	 1675411	       215.8 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10-8     	 1664040	       217.8 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10-8     	 1629267	       220.7 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10-8     	 1668802	       218.2 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10-8     	 1680981	       215.5 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=1000-8   	 1481740	       240.3 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=1000-8   	 1496614	       245.4 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=1000-8   	 1496523	       242.6 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=1000-8   	 1481677	       241.4 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=1000-8   	 1497982	       237.7 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=1000-8   	 1514950	       233.6 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10000-8  	 1391977	       257.3 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10000-8  	 1385390	       263.9 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10000-8  	 1389988	       256.5 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10000-8  	 1360743	       264.9 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10000-8  	 1355618	       264.6 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_Churn/waiters=10000-8  	 1355198	       265.2 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_ChurnOldest-8          	  917540	       360.7 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_ChurnOldest-8          	 1000000	       361.3 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_ChurnOldest-8          	  986637	       350.1 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_ChurnOldest-8          	 1000000	       387.9 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_ChurnOldest-8          	  983397	       345.6 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_ChurnOldest-8          	  957679	       346.9 ns/op	     304 B/op	       3 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10-8         	  935620	       335.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10-8         	 1069094	       337.7 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10-8         	 1000000	       333.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10-8         	  985312	       335.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10-8         	 1010701	       354.6 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10-8         	 1071159	       335.5 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=1000-8       	   11725	     30650 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=1000-8       	   10000	     30545 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=1000-8       	   10000	     30560 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=1000-8       	   10000	     30587 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=1000-8       	   10000	     30684 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=1000-8       	   11694	     30701 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10000-8      	    1125	    336385 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10000-8      	    1070	    315637 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10000-8      	    1140	    316834 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10000-8      	    1117	    313890 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10000-8      	    1140	    313822 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyRoom/waiters=10000-8      	    1142	    313873 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyUserParallel-8            	21263991	        17.26 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyUserParallel-8            	19369940	        16.68 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyUserParallel-8            	20745789	        16.69 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyUserParallel-8            	20606157	        16.91 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyUserParallel-8            	18386965	        16.88 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRegistry_NotifyUserParallel-8            	20713072	        16.96 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/thiagoribeiro/nimlet/internal/sync	17.289s

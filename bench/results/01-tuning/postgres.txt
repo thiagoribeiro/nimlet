@@ -1,0 +1,94 @@
+2026/10/11 10:43:49 OK   00001_create_users.sql (4.97ms)
+2026/10/11 10:43:49 OK   00002_create_devices.sql (4.62ms)
+2026/10/11 10:43:50 OK   00003_create_sessions.sql (5.14ms)
+2026/10/11 10:43:50 OK   00004_create_rooms.sql (2.81ms)
+2026/10/11 10:43:50 OK   00005_create_memberships.sql (4.55ms)
+2026/10/11 10:43:50 OK   00006_create_events.sql (3.15ms)
+2026/10/11 10:43:50 OK   00007_create_event_visibility.sql (1.12ms)
+2026/10/11 10:43:50 OK   00008_create_event_idempotency.sql (3.08ms)
+2026/10/11 10:43:50 OK   00009_partition_management.sql (29.1ms)
+2026/10/11 10:43:50 OK   00010_large_rooms.sql (2.75ms)
+2026/10/11 10:43:50 OK   00011_public_rooms_and_dm.sql (1.8ms)
+2026/10/11 10:43:50 OK   00012_add_device_push_token.sql (521.82µs)
+2026/10/11 10:43:50 OK   00013_add_room_alias_and_expiry.sql (2.24ms)
+2026/10/11 10:43:50 OK   00014_stream_inflight.sql (1.82ms)
+2026/10/11 10:43:50 OK   00015_drop_redundant_indexes.sql (1.77ms)
+2026/10/11 10:43:50 goose: successfully migrated database to version: 15
+goos: linux
+goarch: amd64
+pkg: github.com/thiagoribeiro/nimlet/internal/adapter/postgres
+cpu: AMD Ryzen AI 5 330 w/ Radeon 820M
+BenchmarkEventStore_Create/small_members=10-8         	    5167	    431931 ns/op	    4127 B/op	     103 allocs/op
+BenchmarkEventStore_Create/small_members=10-8         	    4849	    456173 ns/op	    4126 B/op	     103 allocs/op
+BenchmarkEventStore_Create/small_members=10-8         	    4544	    468553 ns/op	    4126 B/op	     103 allocs/op
+BenchmarkEventStore_Create/small_members=10-8         	    4976	    472370 ns/op	    4125 B/op	     103 allocs/op
+BenchmarkEventStore_Create/small_members=10-8         	    5077	    476202 ns/op	    4125 B/op	     103 allocs/op
+BenchmarkEventStore_Create/small_members=10-8         	    4792	    482617 ns/op	    4126 B/op	     103 allocs/op
+BenchmarkEventStore_Create/small_members=200-8        	     990	   2203452 ns/op	   29945 B/op	     301 allocs/op
+BenchmarkEventStore_Create/small_members=200-8        	    1108	   2282339 ns/op	   29951 B/op	     301 allocs/op
+BenchmarkEventStore_Create/small_members=200-8        	    1174	   2172538 ns/op	   29950 B/op	     301 allocs/op
+BenchmarkEventStore_Create/small_members=200-8        	    1155	   2210102 ns/op	   29949 B/op	     301 allocs/op
+BenchmarkEventStore_Create/small_members=200-8        	    1208	   2265786 ns/op	   29952 B/op	     301 allocs/op
+BenchmarkEventStore_Create/small_members=200-8        	    1072	   2257912 ns/op	   29946 B/op	     301 allocs/op
+BenchmarkEventStore_Create/large-8                    	    6862	    340999 ns/op	    3198 B/op	      91 allocs/op
+BenchmarkEventStore_Create/large-8                    	    7078	    337233 ns/op	    3197 B/op	      91 allocs/op
+BenchmarkEventStore_Create/large-8                    	    7401	    332812 ns/op	    3198 B/op	      91 allocs/op
+BenchmarkEventStore_Create/large-8                    	    7083	    340183 ns/op	    3197 B/op	      91 allocs/op
+BenchmarkEventStore_Create/large-8                    	    6925	    333207 ns/op	    3197 B/op	      91 allocs/op
+BenchmarkEventStore_Create/large-8                    	    7146	    338135 ns/op	    3197 B/op	      91 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/initial-8         	    4968	    475851 ns/op	   55306 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/initial-8         	    4638	    454895 ns/op	   55263 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/initial-8         	    5886	    460226 ns/op	   55263 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/initial-8         	    4960	    443211 ns/op	   55263 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/initial-8         	    5106	    443380 ns/op	   55262 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/initial-8         	    4797	    459210 ns/op	   55261 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/incremental-8     	   13105	    181839 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/incremental-8     	   13498	    177437 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/incremental-8     	   13078	    184098 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/incremental-8     	   13474	    179152 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/incremental-8     	   13370	    179891 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=0/incremental-8     	   13504	    177570 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/initial-8         	    4486	    538498 ns/op	   55264 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/initial-8         	    4130	    522131 ns/op	   55265 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/initial-8         	    4560	    533668 ns/op	   55263 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/initial-8         	    4561	    530717 ns/op	   55264 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/initial-8         	    4519	    523112 ns/op	   55262 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/initial-8         	    4102	    529394 ns/op	   55262 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/incremental-8     	   14635	    165421 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/incremental-8     	   14540	    165172 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/incremental-8     	   14596	    165423 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/incremental-8     	   14672	    163341 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/incremental-8     	   14401	    167463 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=5/incremental-8     	   14671	    163616 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/initial-8        	    1974	   1090326 ns/op	   55265 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/initial-8        	    1824	   1103262 ns/op	   55271 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/initial-8        	    2022	   1075961 ns/op	   55265 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/initial-8        	    2246	   1065659 ns/op	   55261 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/initial-8        	    2360	   1067394 ns/op	   55266 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/initial-8        	    2260	   1058812 ns/op	   55262 B/op	     916 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/incremental-8    	    7580	    776638 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/incremental-8    	    9314	    271105 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/incremental-8    	    9979	    276199 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/incremental-8    	    9337	    275922 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/incremental-8    	    9876	    268916 ns/op	    1579 B/op	       6 allocs/op
+BenchmarkEventStore_GetVisible/large_rooms=50/incremental-8    	    9159	    265742 ns/op	    1580 B/op	       6 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=0-8        	   52767	     45508 ns/op	     532 B/op	       5 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=0-8        	   53460	     44612 ns/op	     532 B/op	       5 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=0-8        	   55084	     44817 ns/op	     531 B/op	       5 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=0-8        	   54360	     46203 ns/op	     532 B/op	       5 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=0-8        	   52482	     44980 ns/op	     532 B/op	       5 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=0-8        	   55887	     43819 ns/op	     532 B/op	       5 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=50-8       	   38004	     68499 ns/op	    5483 B/op	     162 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=50-8       	   34928	     65489 ns/op	    5484 B/op	     162 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=50-8       	   37629	     64052 ns/op	    5484 B/op	     162 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=50-8       	   37520	     62843 ns/op	    5483 B/op	     162 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=50-8       	   38514	     63197 ns/op	    5484 B/op	     162 allocs/op
+BenchmarkMembershipStore_ListLargeRooms/large_rooms=50-8       	   38638	     61691 ns/op	    5484 B/op	     162 allocs/op
+BenchmarkAuthLookup-8                                          	   95144	     25172 ns/op	    1039 B/op	      16 allocs/op
+BenchmarkAuthLookup-8                                          	   93602	     24925 ns/op	    1038 B/op	      16 allocs/op
+BenchmarkAuthLookup-8                                          	   92550	     25068 ns/op	    1039 B/op	      16 allocs/op
+BenchmarkAuthLookup-8                                          	   95030	     25323 ns/op	    1039 B/op	      16 allocs/op
+BenchmarkAuthLookup-8                                          	   88486	     25766 ns/op	    1038 B/op	      16 allocs/op
+BenchmarkAuthLookup-8                                          	   94812	     25065 ns/op	    1039 B/op	      16 allocs/op
+PASS
+ok  	github.com/thiagoribeiro/nimlet/internal/adapter/postgres	179.079s

@@ -1,0 +1,8 @@
+setup: 200 users joined room 5ecd69c6-b382-45a5-859b-25f8217e546b in 2.543s
+
+scenario: members=200 listeners=200 senders=10 rate=200/s duration=30s
+sent: 5903 (195.1/s), send errors: 0, sync errors: 0, sync calls: 64037
+delivered: 1070290 / 1180600 expected (90.66%), duplicates: 0
+initial sync  n=200     p50=146.8ms    p95=220.66ms   p99=267.13ms   max=270.95ms
+send          n=5903    p50=225.55ms   p95=272.95ms   p99=301.56ms   max=385.18ms
+delivery      n=1070290 p50=271.87ms   p95=332.84ms   p99=359.8ms    max=451.99ms

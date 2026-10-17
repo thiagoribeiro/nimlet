@@ -1,0 +1,8 @@
+.env
+**/.env
+*.db
+bin/
+media/
+*.pprof
+*.log
+.claude/

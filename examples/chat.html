@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NimChat</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Setup screen ── */
+  #setup {
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    padding: 32px;
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  #setup h1 { font-size: 22px; font-weight: 700; color: #a78bfa; letter-spacing: -0.3px; }
+  #setup p.sub { font-size: 13px; color: #64748b; }
+
+  .user-badge {
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .user-badge strong { color: #a78bfa; }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #374151;
+    font-size: 12px;
+  }
+  .divider::before, .divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #2d3148;
+  }
+
+  button {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: #6d28d9; }
+  button:disabled { background: #374151; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid #2d3148;
+    color: #94a3b8;
+  }
+  .btn-ghost:hover { background: #1e2433; color: #e2e8f0; }
+
+  .row { display: flex; gap: 8px; }
+  .row input, .row button { flex: 1; }
+
+  input {
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    color: #e2e8f0;
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+  input:focus { border-color: #7c3aed; }
+  input::placeholder { color: #374151; }
+
+  /* ── Chat screen ── */
+  #chat {
+    display: none;
+    flex-direction: column;
+    width: 480px;
+    height: 90vh;
+    max-height: 700px;
+    background: #1a1d27;
+    border: 1px solid #2d3148;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  #chat-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #2d3148;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .room-info { display: flex; flex-direction: column; gap: 2px; }
+  .room-name { font-size: 15px; font-weight: 600; }
+  .room-id {
+    font-size: 11px;
+    color: #4b5563;
+    font-family: monospace;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .room-id:hover { color: #94a3b8; }
+
+  .me-badge {
+    font-size: 12px;
+    color: #94a3b8;
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 20px;
+    padding: 4px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scroll-behavior: smooth;
+  }
+
+  .msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 78%;
+    gap: 2px;
+  }
+  .msg.mine { align-self: flex-end; align-items: flex-end; }
+  .msg.theirs { align-self: flex-start; align-items: flex-start; }
+
+  .msg-sender {
+    font-size: 10px;
+    color: #4b5563;
+    padding: 0 4px;
+  }
+
+  .msg-bubble {
+    border-radius: 14px;
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+  .mine .msg-bubble {
+    background: #7c3aed;
+    border-bottom-right-radius: 4px;
+  }
+  .theirs .msg-bubble {
+    background: #252836;
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-time {
+    font-size: 10px;
+    color: #374151;
+    padding: 0 4px;
+  }
+
+  .system-msg {
+    align-self: center;
+    font-size: 11px;
+    color: #374151;
+    padding: 4px 10px;
+    background: #0f1117;
+    border-radius: 20px;
+    margin: 4px 0;
+  }
+
+  #input-area {
+    padding: 12px 14px;
+    border-top: 1px solid #2d3148;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #msg-input {
+    flex: 1;
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 22px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #e2e8f0;
+    outline: none;
+    resize: none;
+  }
+  #msg-input:focus { border-color: #7c3aed; }
+
+  #send-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  #sync-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+  }
+  #sync-dot.off { background: #ef4444; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #252836;
+    border: 1px solid #2d3148;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13px;
+    color: #e2e8f0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- Setup screen -->
+<div id="setup">
+  <div>
+    <h1>NimChat</h1>
+    <p class="sub" style="margin-top:6px">real-time messaging demo</p>
+  </div>
+
+  <div id="user-info" class="user-badge">registering…</div>
+
+  <div class="divider">create</div>
+
+  <button id="create-btn">Create new room</button>
+
+  <div class="divider">or join</div>
+
+  <div class="row">
+    <input id="room-id-input" type="text" placeholder="paste room ID…" />
+    <button id="join-btn">Join</button>
+  </div>
+</div>
+
+<!-- Chat screen -->
+<div id="chat">
+  <div id="chat-header">
+    <div class="room-info">
+      <span class="room-name">Room</span>
+      <span class="room-id" id="room-id-label" title="click to copy">─</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="sync-dot"></div>
+      <div class="me-badge" id="me-label">─</div>
+    </div>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="input-area">
+    <input id="msg-input" type="text" placeholder="message…" autocomplete="off" />
+    <button id="send-btn" title="Send">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Server URL: ?server=http://host:port, else the page origin, else localhost.
+const BASE = new URLSearchParams(location.search).get("server")
+  || (location.protocol.startsWith("http") ? location.origin : "http://localhost:8080");
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+
+function adjective() {
+  const adj = ["swift","brave","calm","bold","keen","wise","kind","neat","cool","dark","gold","jade","rose","sage","teal"];
+  const noun = ["otter","fox","raven","panda","lynx","crane","wolf","moth","elk","hawk","frog","owl","bear","cat","koi"];
+  return adj[Math.random()*adj.length|0] + "_" + noun[Math.random()*noun.length|0];
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2,10);
+}
+
+async function api(method, path, body, token) {
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(BASE + path, {
+    method,
+    headers,
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 204) return null;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+  return data;
+}
+
+function showToast(msg, ms = 2500) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), ms);
+}
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// ── state ────────────────────────────────────────────────────────────────────
+
+let state = JSON.parse(localStorage.getItem("nimlet") || "null");
+let syncAbort = null;
+
+// ── setup screen ─────────────────────────────────────────────────────────────
+
+async function init() {
+  if (!state) {
+    const name = adjective();
+    const password = uid();
+    try {
+      const r = await api("POST", "/register", {
+        username: name,
+        password,
+        display_name: name,
+        device_name: "browser",
+        user_type: "human",
+      });
+      state = { username: name, password, userId: r.user_id, token: r.access_token };
+      localStorage.setItem("nimlet", JSON.stringify(state));
+    } catch (e) {
+      $("user-info").textContent = "Registration failed: " + e.message;
+      return;
+    }
+  }
+
+  $("user-info").innerHTML = `Signed in as <strong>${state.username}</strong>`;
+
+  $("create-btn").onclick = createRoom;
+  $("join-btn").onclick = () => joinRoom($("room-id-input").value.trim());
+  $("room-id-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") joinRoom($("room-id-input").value.trim());
+  });
+}
+
+async function createRoom() {
+  $("create-btn").disabled = true;
+  try {
+    const r = await api("POST", "/rooms", { name: `${state.username}'s room`, visibility: "public" }, state.token);
+    enterChat(r.room_id, r.name);
+  } catch (e) {
+    showToast("Error: " + e.message);
+    $("create-btn").disabled = false;
+  }
+}
+
+async function joinRoom(roomId) {
+  if (!roomId) { showToast("Paste a room ID first"); return; }
+  $("join-btn").disabled = true;
+  try {
+    await api("POST", `/rooms/${roomId}/join`, null, state.token);
+    enterChat(roomId, roomId.slice(0, 8) + "…");
+  } catch (e) {
+    showToast("Error: " + e.message);
+    $("join-btn").disabled = false;
+  }
+}
+
+// ── chat screen ───────────────────────────────────────────────────────────────
+
+function enterChat(roomId, roomName) {
+  $("setup").style.display = "none";
+  $("chat").style.display = "flex";
+
+  $("room-id-label").textContent = `📋 ${roomId}`;
+  $("room-id-label").onclick = () => {
+    navigator.clipboard.writeText(roomId).then(() => showToast("Room ID copied!"));
+  };
+  document.querySelector(".room-name").textContent = roomName;
+  $("me-label").textContent = state.username;
+
+  addSystemMsg("You joined the room");
+
+  $("msg-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  $("send-btn").onclick = sendMessage;
+
+  startSync(roomId);
+}
+
+const seenIds = new Set();
+
+function renderEvent(ev) {
+  if (seenIds.has(ev.event_id)) return;
+  seenIds.add(ev.event_id);
+
+  if (ev.type !== "m.room.message") return;
+
+  const body = ev.content?.body;
+  if (!body) return;
+
+  const isMine = ev.sender_id === state.userId;
+  const div = document.createElement("div");
+  div.className = `msg ${isMine ? "mine" : "theirs"}`;
+
+  if (!isMine) {
+    const sender = document.createElement("div");
+    sender.className = "msg-sender";
+    sender.textContent = ev.sender_display_name || ev.sender_id.slice(0, 8) + "…";
+    div.appendChild(sender);
+  }
+
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble";
+  bubble.textContent = body;
+  div.appendChild(bubble);
+
+  const time = document.createElement("div");
+  time.className = "msg-time";
+  time.textContent = formatTime(ev.origin_server_ts);
+  div.appendChild(time);
+
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function addSystemMsg(text) {
+  const div = document.createElement("div");
+  div.className = "system-msg";
+  div.textContent = text;
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+let txnCounter = Date.now();
+
+async function sendMessage() {
+  const input = $("msg-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  const txnId = `txn_${++txnCounter}`;
+  try {
+    await api(
+      "PUT",
+      `/rooms/${currentRoomId}/send/m.room.message/${txnId}`,
+      { msgtype: "m.text", body: text },
+      state.token
+    );
+  } catch (e) {
+    showToast("Send failed: " + e.message);
+    input.value = text;
+  }
+}
+
+let currentRoomId = null;
+let since = ""; // opaque cursor from the server; "" = from the start
+
+function startSync(roomId) {
+  currentRoomId = roomId;
+  since = "";
+  if (syncAbort) syncAbort.abort();
+  syncAbort = new AbortController();
+  syncLoop(syncAbort.signal);
+}
+
+async function syncLoop(signal) {
+  const dot = $("sync-dot");
+  while (!signal.aborted) {
+    try {
+      const res = await fetch(
+        `${BASE}/sync?since=${encodeURIComponent(since)}&timeout=30000`,
+        {
+          headers: { Authorization: `Bearer ${state.token}` },
+          signal,
+        }
+      );
+      if (res.status === 400) { since = ""; continue; } // cursor rejected: start over
+      if (!res.ok) { await sleep(3000); continue; }
+      const data = await res.json();
+      since = data.next_batch;
+      dot.className = ""; // green
+      for (const ev of data.events || []) {
+        if (ev.room_id === currentRoomId) renderEvent(ev);
+      }
+    } catch (e) {
+      if (signal.aborted) return;
+      dot.className = "off";
+      await sleep(3000);
+    }
+  }
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+init();
+</script>
+</body>
+</html>

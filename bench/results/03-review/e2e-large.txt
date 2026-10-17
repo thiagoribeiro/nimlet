@@ -1,0 +1,8 @@
+setup: 1100 users joined room aaa40ff8-9bc3-4aa3-b716-a53855337baa in 13.016s
+
+scenario: members=1100 listeners=300 senders=10 rate=50/s duration=30s
+sent: 1500 (50.0/s), send errors: 0, sync errors: 0, sync calls: 132431
+delivered: 450000 / 450000 expected (100.00%), duplicates: 0
+initial sync  n=300     p50=51.04ms    p95=74.76ms    p99=78.94ms    max=79.36ms
+send          n=1500    p50=26.52ms    p95=59.43ms    p99=73.6ms     max=106.83ms
+delivery      n=450000  p50=53.73ms    p95=92.06ms    p99=107.36ms   max=175.08ms

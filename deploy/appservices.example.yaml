@@ -1,0 +1,12 @@
+# AppServices config (NIMLET_APP_SERVICES_FILE). See README "AppServices".
+# Tokens are secrets: generate them (e.g. `openssl rand -hex 32`) and never reuse one across entries.
+app_services:
+  - id: acme-bridge
+    namespace: acme                # must exist and be active (nimlet namespace create acme)
+    endpoint: http://acme-bridge:9000
+    hs_token: change-me-hs-token     # Nimlet → bridge (Authorization on POST {endpoint}/events)
+    as_token: change-me-as-token     # bridge → Nimlet (/appservice/acme-bridge/...)
+    sender_username: acme-bot      # service account, created in the namespace on first start
+    interested_events:
+      - m.room.message
+      - "brian.*"                    # trailing * is a prefix glob; "*" alone matches everything

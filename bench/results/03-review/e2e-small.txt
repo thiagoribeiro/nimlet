@@ -1,0 +1,8 @@
+setup: 200 users joined room d93cc02b-a883-4dfa-8573-42a8d807274e in 2.342s
+
+scenario: members=200 listeners=200 senders=10 rate=200/s duration=30s
+sent: 5974 (199.0/s), send errors: 0, sync errors: 0, sync calls: 178727
+delivered: 1194800 / 1194800 expected (100.00%), duplicates: 0
+initial sync  n=200     p50=26.92ms    p95=47.92ms    p99=51.14ms    max=53.44ms
+send          n=5974    p50=56.57ms    p95=95.44ms    p99=109.74ms   max=153.62ms
+delivery      n=1194800 p50=74.49ms    p95=119.55ms   p99=137.33ms   max=199.8ms

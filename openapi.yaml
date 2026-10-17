@@ -1,0 +1,778 @@
+openapi: 3.1.0
+info:
+  title: Nimlet API
+  version: 0.2.0
+  description: |
+    Nimlet is a small, self-hostable HTTP-first room/event backend.
+
+    It provides multi-user rooms, immutable events, idempotent sends, incremental /sync,
+    long polling, memberships, media upload/download, and Redis-backed cross-instance
+    wake-up.
+
+    Sender identity is always derived from the authenticated session. Clients must not
+    self-declare sender_id, user_type, or room role.
+
+    ## Authentication
+    All endpoints except /register and /login require:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+
+    ## Idempotency
+    `PUT /rooms/{roomId}/send/{eventType}/{txnId}` uses the `txnId` path segment as an
+    idempotency key scoped to the authenticated device. Retrying the same txnId returns
+    the original event without creating a duplicate.
+
+    ## Long polling
+    `GET /sync` holds the connection until new events arrive or the timeout elapses.
+    Clients must loop: open /sync → receive → use next_batch as since → open again.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Registration, login, and logout.
+  - name: Rooms
+    description: Room creation, membership management.
+  - name: Events
+    description: Sending events and paginating history.
+  - name: Sync
+    description: Incremental real-time sync.
+  - name: Media
+    description: Media upload and download.
+
+paths:
+
+  # ── Auth ─────────────────────────────────────────────────────────────────
+
+  /register:
+    post:
+      tags: [Auth]
+      summary: Register a new user and device
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              username: alice
+              password: s3cr3t
+              display_name: Alice
+              device_name: iPhone
+              user_type: human
+      responses:
+        "201":
+          description: User and device created; access token returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+              example:
+                user_id: 2cdeb976-ce40-492d-9409-c34d21523e18
+                device_id: 1328f2b9-f916-424a-a5b4-1719d506c43f
+                access_token: NmJiMW...
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Login with username and password
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              username: alice
+              password: s3cr3t
+              device_name: iPhone
+      responses:
+        "200":
+          description: Session created; access token returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /logout:
+    delete:
+      tags: [Auth]
+      summary: Revoke current session
+      operationId: logout
+      responses:
+        "204":
+          description: Session revoked.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Rooms ─────────────────────────────────────────────────────────────────
+
+  /rooms:
+    post:
+      tags: [Rooms]
+      summary: Create a room
+      operationId: createRoom
+      description: |
+        Creates a new room. The authenticated user becomes the owner and is
+        automatically added as a joined member.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoomRequest"
+            example:
+              name: general
+      responses:
+        "201":
+          description: Room created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateRoomResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /rooms/{roomId}/invite:
+    post:
+      tags: [Rooms]
+      summary: Invite a user to a room
+      operationId: inviteUser
+      description: |
+        Adds the target user to the room with state `invite`. Only `owner` and
+        `admin` members may invite.
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteRequest"
+            example:
+              user_id: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "204":
+          description: Invitation sent.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /rooms/{roomId}/join:
+    post:
+      tags: [Rooms]
+      summary: Join a room
+      operationId: joinRoom
+      description: |
+        Transitions the authenticated user's membership from `invite` to `join`.
+        Idempotent if already joined. Increments `member_count` atomically;
+        rooms with ≥ 1000 members switch to the large-room fan-out strategy.
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+      responses:
+        "204":
+          description: Joined (or already joined).
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Events ────────────────────────────────────────────────────────────────
+
+  /rooms/{roomId}/send/{eventType}/{txnId}:
+    put:
+      tags: [Events]
+      summary: Send an event (idempotent)
+      operationId: sendEvent
+      description: |
+        Creates an immutable room event.
+
+        The `txnId` path segment is an idempotency key scoped to the authenticated
+        device. If the same device retries with the same `txnId` in the same room,
+        the original event is returned without duplication.
+
+        Sender identity is derived from the authenticated session — clients must not
+        include sender fields in the content body.
+
+        **Large-room routing:** for rooms with ≥ 1000 members, the server skips
+        per-user visibility rows and emits a single room-level wake-up instead of
+        N per-user notifications.
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+        - $ref: "#/components/parameters/EventType"
+        - $ref: "#/components/parameters/TxnId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventContent"
+            examples:
+              text_message:
+                summary: Plain text message
+                value:
+                  msgtype: m.text
+                  body: Hello world
+              image_message:
+                summary: Image attachment
+                value:
+                  msgtype: m.image
+                  body: photo.jpg
+                  url: mxc://nimlet/media_01HX
+      responses:
+        "200":
+          description: Event already existed for this txnId (idempotent replay).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEventResponse"
+        "201":
+          description: New event created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /rooms/{roomId}/messages:
+    get:
+      tags: [Events]
+      summary: Paginate room history
+      operationId: getRoomMessages
+      description: |
+        Returns a page of events from the room timeline.
+
+        Use `dir=b` to scroll back (before `from`) and `dir=f` to scroll
+        forward (after `from`). For real-time catch-up, prefer `/sync`.
+      parameters:
+        - $ref: "#/components/parameters/RoomId"
+        - name: from
+          in: query
+          description: >-
+            A `room_seq` (exclusive), usually the `end` of the previous page. Omit to start at
+            the newest event (`dir=b`) or the oldest (`dir=f`). A non-numeric value is 400.
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+        - name: dir
+          in: query
+          description: "`b` for backwards (before cursor), `f` for forwards (after cursor)."
+          schema:
+            type: string
+            enum: [b, f]
+            default: f
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Event page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ── Sync ──────────────────────────────────────────────────────────────────
+
+  /sync:
+    get:
+      tags: [Sync]
+      summary: Incremental sync with long polling
+      operationId: sync
+      description: |
+        Returns events visible to the authenticated user after the `since` cursor.
+
+        **Fast path:** if matching events already exist, responds immediately.
+
+        **Slow path:** if no events are available, the server holds the connection
+        until a new event arrives (via Redis wake-up), the timeout elapses, or the
+        client disconnects. Always returns 200.
+
+        The client must loop: open /sync → receive response → use `next_batch` as
+        `since` → open again.
+
+        **Large rooms:** events from rooms with ≥ 1000 members are pulled directly
+        from the `events` table via a UNION ALL query. No additional parameters needed.
+      parameters:
+        - name: since
+          in: query
+          description: >-
+            Opaque cursor: the previous response's `next_batch`, passed back unchanged. Omit on
+            the first sync (`0` is accepted as the same). A malformed, tampered or foreign cursor is 400 `INVALID_CURSOR`;
+            start over without `since`.
+          schema:
+            type: string
+            pattern: "^c1\\."
+        - name: timeout
+          in: query
+          description: Long-poll timeout in milliseconds. Capped at 60000.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 60000
+            default: 30000
+      responses:
+        "200":
+          description: |
+            Sync response. Always 200 — an empty `events` array means the timeout
+            elapsed with no new events. Use `next_batch` as the next `since`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResponse"
+              examples:
+                with_events:
+                  summary: New events available
+                  value:
+                    next_batch: c1.v8JmW1yq3bXq0kq2m3Jw9a7dQe4ZtYQd4nY6wq
+                    events:
+                      - event_id: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+                        room_seq: 42
+                        room_id: 550e8400-e29b-41d4-a716-446655440000
+                        sender_id: 2cdeb976-ce40-492d-9409-c34d21523e18
+                        type: m.room.message
+                        content:
+                          msgtype: m.text
+                          body: hello
+                        origin_server_ts: 1777050001000
+                timeout:
+                  summary: Timeout with no new events
+                  value:
+                    next_batch: c1.Qa2eT9kq1ZbWm0XvLr7sYc3dNf8hJpGu5oKiE
+                    events: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Media ─────────────────────────────────────────────────────────────────
+
+  /media/upload:
+    post:
+      tags: [Media]
+      summary: Upload media
+      operationId: uploadMedia
+      description: |
+        Streams the request body directly to the configured media store (local
+        filesystem or S3-compatible). No buffering in application memory.
+
+        Set `Content-Type` to the MIME type of the file being uploaded.
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+          image/*:
+            schema:
+              type: string
+              format: binary
+          video/*:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Media stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaUploadResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /media/{mediaId}:
+    get:
+      tags: [Media]
+      summary: Download media
+      operationId: downloadMedia
+      description: |
+        Streams the media file. Uses sendfile(2) on Linux for local files and
+        streams the S3 response body without buffering.
+      parameters:
+        - $ref: "#/components/parameters/MediaId"
+      responses:
+        "200":
+          description: Binary media content.
+          headers:
+            Content-Type:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: HMAC-signed opaque token returned by /register or /login.
+
+  parameters:
+    RoomId:
+      name: roomId
+      in: path
+      required: true
+      schema:
+        type: string
+    EventType:
+      name: eventType
+      in: path
+      required: true
+      description: "Event type, e.g. `m.room.message` or `com.example.task.created`."
+      schema:
+        type: string
+        pattern: "^[a-zA-Z0-9._:-]+$"
+    TxnId:
+      name: txnId
+      in: path
+      required: true
+      description: Client-generated transaction ID for idempotency. Must be unique per device+room.
+      schema:
+        type: string
+        minLength: 1
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing, invalid, expired, or revoked access token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Authenticated user is not allowed to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            not_joined:
+              summary: User is not a joined member
+              value:
+                code: NOT_JOINED
+                message: "room: user is not joined"
+            permission_denied:
+              summary: Insufficient role
+              value:
+                code: FORBIDDEN
+                message: "room: invite: permission denied"
+    NotFound:
+      description: Resource not found or not visible to the authenticated user.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict with current state (e.g. username already taken).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          examples:
+            - NOT_FOUND
+            - FORBIDDEN
+            - NOT_JOINED
+            - CONFLICT
+            - UNAUTHORIZED
+            - INTERNAL_ERROR
+        message:
+          type: string
+          description: Human-readable error description.
+      additionalProperties: false
+
+    UserType:
+      type: string
+      enum: [human, agent, bot, system, service]
+
+    # ── Auth schemas ──────────────────────────────────────────────────────────
+
+    RegisterRequest:
+      type: object
+      required: [username, password, display_name, device_name]
+      properties:
+        namespace:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+          description: >-
+            Slug of the namespace to create the account in. It must allow public registration (`default` does; new namespaces do not until an operator enables it), otherwise 403 REGISTRATION_CLOSED. Optional; the `default` namespace when omitted.
+            A selector only — it grants nothing by itself.
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
+        display_name:
+          type: string
+          minLength: 1
+        device_name:
+          type: string
+          minLength: 1
+        user_type:
+          type: string
+          enum: [human]
+          description: >-
+            Optional; only `human` is accepted (clients cannot declare their account type).
+            Agents, bots and service accounts are created by operators or AppServices.
+      additionalProperties: false
+
+    RegisterResponse:
+      type: object
+      required: [user_id, device_id, access_token]
+      properties:
+        user_id:
+          type: string
+        device_id:
+          type: string
+        access_token:
+          type: string
+      additionalProperties: false
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        device_id:
+          type: string
+          description: >-
+            Optional. The device_id a previous login returned; the device is reused if it is
+            the user's and enabled, otherwise a new one is created.
+        namespace:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+          description: >-
+            Slug of the namespace whose accounts `username` is looked up in. The session is bound to it. Unknown namespace, unknown user and wrong password all return 401. Optional; the `default` namespace when omitted.
+            A selector only — it grants nothing by itself.
+        username:
+          type: string
+        password:
+          type: string
+        device_name:
+          type: string
+      additionalProperties: false
+
+    LoginResponse:
+      type: object
+      required: [session_id, access_token]
+      properties:
+        session_id:
+          type: string
+        access_token:
+          type: string
+      additionalProperties: false
+
+    # ── Room schemas ──────────────────────────────────────────────────────────
+
+    CreateRoomRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+      additionalProperties: false
+
+    CreateRoomResponse:
+      type: object
+      required: [room_id, name, creator_id]
+      properties:
+        room_id:
+          type: string
+        name:
+          type: string
+        creator_id:
+          type: string
+      additionalProperties: false
+
+    InviteRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+      additionalProperties: false
+
+    # ── Event schemas ─────────────────────────────────────────────────────────
+
+    EventContent:
+      type: object
+      description: Arbitrary JSON payload. Nimlet stores and forwards without interpretation.
+      additionalProperties: true
+
+    Event:
+      type: object
+      required: [event_id, room_seq, room_id, sender_id, type, content, origin_server_ts]
+      description: >-
+        Events carry no global stream position (it would leak other namespaces' volume). Within a
+        room, order and dedupe them by `room_seq`.
+      properties:
+        event_id:
+          type: string
+          description: Unique event identifier (UUID).
+        room_seq:
+          type: integer
+          format: int64
+          description: >-
+            Per-room order: increases with each event of the room in the order /sync delivers
+            them, starting at 1. May have gaps.
+        room_id:
+          type: string
+        sender_id:
+          type: string
+          description: User ID of the sender, derived from the authenticated session.
+        type:
+          type: string
+          description: "Event type, e.g. `m.room.message`."
+        content:
+          $ref: "#/components/schemas/EventContent"
+        origin_server_ts:
+          type: integer
+          format: int64
+          description: Server-assigned creation timestamp in Unix milliseconds.
+      additionalProperties: false
+
+    SendEventResponse:
+      type: object
+      required: [event_id, room_seq]
+      properties:
+        event_id:
+          type: string
+        room_seq:
+          type: integer
+          format: int64
+      additionalProperties: false
+
+    MessagesResponse:
+      type: object
+      required: [start, end, chunk]
+      properties:
+        start:
+          type: integer
+          format: int64
+          description: The `from` of this page.
+        end:
+          type: integer
+          format: int64
+          description: >-
+            `room_seq` of the last event of this page (`start` if empty). Pass as `from` for the
+            next page.
+        chunk:
+          type: array
+          items:
+            $ref: "#/components/schemas/Event"
+      additionalProperties: false
+
+    # ── Sync schemas ──────────────────────────────────────────────────────────
+
+    SyncResponse:
+      type: object
+      required: [next_batch, events]
+      properties:
+        next_batch:
+          type: string
+          description: |
+            Opaque cursor after the last returned event (or equivalent to `since` if none
+            arrived). Pass it unchanged as `since` in the next /sync call.
+        events:
+          type: array
+          description: |
+            Events visible to the authenticated user after `since`, in stream order. Includes events from small rooms (via
+            event_visibility) and large rooms (≥ 1000 members, via direct pull).
+          items:
+            $ref: "#/components/schemas/Event"
+      additionalProperties: false
+
+    # ── Media schemas ─────────────────────────────────────────────────────────
+
+    MediaUploadResponse:
+      type: object
+      required: [media_id, content_uri]
+      properties:
+        media_id:
+          type: string
+        content_uri:
+          type: string
+          description: "Stable reference URI, e.g. `mxc://nimlet/media_01HX`."
+      additionalProperties: false

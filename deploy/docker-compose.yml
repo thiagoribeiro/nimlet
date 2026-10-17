@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      # POSTGRES_USER/POSTGRES_DB only take effect when the volume is first initialised.
+      POSTGRES_USER: ${POSTGRES_USER:-nimlet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-nimlet}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nimlet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nimlet:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["server"]
+    ports:
+      - "8090:8080"
+    environment:
+      NIMLET_DB_DSN: postgres://${POSTGRES_USER:-nimlet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimlet}?sslmode=disable
+      NIMLET_AUTH_HMAC_SECRET: ${NIMLET_AUTH_HMAC_SECRET}
+      NIMLET_REDIS_ADDR: redis:6379
+      NIMLET_HTTP_ADDR: :8080
+      NIMLET_MEDIA_DRIVER: ${NIMLET_MEDIA_DRIVER:-filesystem}
+      NIMLET_MEDIA_PATH: /data/media
+      NIMLET_S3_BUCKET: ${NIMLET_S3_BUCKET:-}
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: postgres://${POSTGRES_USER:-nimlet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimlet}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: redis:6379
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data:
+  media_data:

@@ -15,6 +15,7 @@ type NamespaceStore interface {
 	List(ctx context.Context) ([]*domain.Namespace, error)
 	SetStatus(ctx context.Context, id string, status domain.NamespaceStatus) error
 	SetAllowRegistration(ctx context.Context, id string, allow bool) error
+	SetPushMode(ctx context.Context, id string, mode domain.PushMode) error
 }
 
 // MediaIndex records which namespace and user each upload belongs to, so downloads can

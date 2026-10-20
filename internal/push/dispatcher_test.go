@@ -18,8 +18,27 @@ import (
 const testWindow = 20 * time.Millisecond
 
 type fakeSender struct {
-	mu   sync.Mutex
-	sent []push.Digest
+	mu       sync.Mutex
+	sent     []push.Digest
+	messages []sentMessage
+}
+
+type sentMessage struct {
+	token string
+	msg   push.MessagePush
+}
+
+func (f *fakeSender) SendMessage(_ context.Context, token string, msg push.MessagePush) error {
+	f.mu.Lock()
+	f.messages = append(f.messages, sentMessage{token, msg})
+	f.mu.Unlock()
+	return nil
+}
+
+func (f *fakeSender) messagesSent() []sentMessage {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]sentMessage(nil), f.messages...)
 }
 
 func (f *fakeSender) Send(_ context.Context, _ string, digest push.Digest) error {

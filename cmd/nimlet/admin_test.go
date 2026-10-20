@@ -39,6 +39,7 @@ func TestCLI_UsageErrorsNeedNoDatabase(t *testing.T) {
 		{"namespace", "create"},                     // missing slug
 		{"namespace", "disable", "x"},               // no --confirm
 		{"namespace", "registration", "x", "maybe"}, // bad value
+		{"namespace", "push", "x", "loud"},          // bad push mode
 		{"user", "list", "-n", "x"},                 // no NIMLET_ADMIN_DB_DSN
 	} {
 		var errOut bytes.Buffer

@@ -239,6 +239,12 @@ func TestNamespaceStore(t *testing.T) {
 	assert.Equal(t, domain.NamespaceActive, got.Status)
 	assert.Nil(t, got.DisabledAt)
 	assert.True(t, got.AllowRegistration)
+	assert.Equal(t, domain.PushDigest, got.PushMode, "new namespaces default to digest pushes")
+	require.NoError(t, store.SetPushMode(ctx, ns.ID, domain.PushMessage))
+	got, err = store.GetByID(ctx, ns.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.PushMessage, got.PushMode)
+	assert.ErrorIs(t, store.SetPushMode(ctx, uuid.NewString(), domain.PushMessage), domain.ErrNotFound)
 
 	assert.ErrorIs(t, store.SetStatus(ctx, uuid.NewString(), domain.NamespaceDisabled), domain.ErrNotFound)
 

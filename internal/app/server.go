@@ -175,7 +175,7 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 	presenceStore := redis.NewPresenceStore(redisClient)
 	pushQueue := redis.NewPushQueue(redisClient)
 
-	pushDispatcher, err := newPushDispatcher(ctx, cfg, pushQueue, presenceStore, deviceStore)
+	pushDispatcher, err := newPushDispatcher(ctx, cfg, pushQueue, presenceStore, deviceStore, namespaceStore, userStore)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func newMediaStore(ctx context.Context, cfg *appcfg.Config) (out.MediaStore, err
 }
 
 // newPushDispatcher is a no-op unless a Firebase service-account key is configured.
-func newPushDispatcher(ctx context.Context, cfg *appcfg.Config, queue out.PushQueue, presence out.PresenceStore, devices out.DeviceStore) (in.PushDispatcher, error) {
+func newPushDispatcher(ctx context.Context, cfg *appcfg.Config, queue out.PushQueue, presence out.PresenceStore, devices out.DeviceStore, namespaces out.NamespaceStore, users out.UserStore) (in.PushDispatcher, error) {
 	if cfg.Push.FCMCredentialsFile == "" {
 		slog.Info("push: disabled (NIMLET_FCM_CREDENTIALS_FILE not set)")
 		return push.NopDispatcher{}, nil
@@ -276,7 +276,7 @@ func newPushDispatcher(ctx context.Context, cfg *appcfg.Config, queue out.PushQu
 		return nil, fmt.Errorf("fcm: %w", err)
 	}
 	slog.Info("push: FCM dispatcher enabled")
-	return push.NewDispatcher(queue, presence, devices, sender, pushCoalesceWindow), nil
+	return push.NewDispatcher(queue, presence, devices, sender, pushCoalesceWindow).WithMessageMode(namespaces, users), nil
 }
 
 // runSweeper periodically reclaims rooms past their TTL, expired sessions and abandoned

@@ -15,12 +15,13 @@ type namespaceJSON struct {
 	Slug              string  `json:"slug"`
 	Status            string  `json:"status"`
 	AllowRegistration bool    `json:"allow_registration"`
+	PushMode          string  `json:"push_mode"`
 	CreatedAt         string  `json:"created_at"`
 	DisabledAt        *string `json:"disabled_at"`
 }
 
 func namespaceRow(n *domain.Namespace) row {
-	j := namespaceJSON{ID: n.ID, Slug: n.Slug, Status: string(n.Status), AllowRegistration: n.AllowRegistration, CreatedAt: ts(n.CreatedAt)}
+	j := namespaceJSON{ID: n.ID, Slug: n.Slug, Status: string(n.Status), AllowRegistration: n.AllowRegistration, PushMode: string(n.PushMode), CreatedAt: ts(n.CreatedAt)}
 	disabled := "-"
 	if n.DisabledAt != nil {
 		d := ts(*n.DisabledAt)
@@ -28,7 +29,7 @@ func namespaceRow(n *domain.Namespace) row {
 	}
 	return row{id: n.ID, json: j, fields: [][2]string{
 		{"slug", n.Slug}, {"id", n.ID}, {"status", string(n.Status)},
-		{"registration", strconv.FormatBool(n.AllowRegistration)}, {"created", j.CreatedAt}, {"disabled", disabled},
+		{"registration", strconv.FormatBool(n.AllowRegistration)}, {"push", string(n.PushMode)}, {"created", j.CreatedAt}, {"disabled", disabled},
 	}}
 }
 
@@ -164,6 +165,28 @@ func newNamespaceCmd(f *adminFlags) *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(create, list, show, disable, enable, registration)
+	push := &cobra.Command{
+		Use:   "push <slug> <digest|message>",
+		Short: "Choose how offline members are notified",
+		Long: "digest: one coalesced push with room names and counts, never message content.\n" +
+			"message: one push per message with a short preview; the preview transits FCM.",
+		Example: "  nimlet namespace push default message",
+		Args:    args(cobra.ExactArgs(2)),
+		RunE: func(c *cobra.Command, a []string) error {
+			mode, err := domain.ParsePushMode(a[1])
+			if err != nil {
+				return usageError{err}
+			}
+			return withAdmin(c, func(svc in.AdminService) error {
+				n, err := svc.SetNamespacePushMode(c.Context(), a[0], mode)
+				if err != nil {
+					return err
+				}
+				return printOne(c, n)
+			})
+		},
+	}
+
+	cmd.AddCommand(create, list, show, disable, enable, registration, push)
 	return cmd
 }

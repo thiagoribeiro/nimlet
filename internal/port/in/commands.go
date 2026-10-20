@@ -101,6 +101,7 @@ type AdminService interface {
 	GetNamespace(ctx context.Context, slug string) (*domain.Namespace, error)
 	SetNamespaceStatus(ctx context.Context, slug string, status domain.NamespaceStatus) (*domain.Namespace, error)
 	SetNamespaceRegistration(ctx context.Context, slug string, allow bool) (*domain.Namespace, error)
+	SetNamespacePushMode(ctx context.Context, slug string, mode domain.PushMode) (*domain.Namespace, error)
 
 	CreateUser(ctx context.Context, cmd AdminCreateUserCmd) (*domain.User, error)
 	ListUsers(ctx context.Context, namespace, afterUsername string, limit int) ([]*domain.User, error)

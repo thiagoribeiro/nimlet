@@ -3,18 +3,33 @@ package push
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/thiagoribeiro/nimlet/internal/domain"
 	"github.com/thiagoribeiro/nimlet/internal/port/out"
 )
 
-// Sender delivers one push digest to one device token. Implementations wrap a
-// specific provider — e.g. FCM HTTP v1, using a Firebase service-account key. Not
-// implemented yet: wire a real Sender into NewDispatcher once a Firebase project
-// and its credentials exist.
+// Sender delivers pushes to one device token. Implementations wrap a specific
+// provider — e.g. FCM HTTP v1, using a Firebase service-account key.
 type Sender interface {
+	// Send delivers a digest (namespaces in digest mode).
 	Send(ctx context.Context, token string, digest Digest) error
+	// SendMessage delivers one message with its preview (namespaces in message mode).
+	SendMessage(ctx context.Context, token string, msg MessagePush) error
+}
+
+// MessagePush is one message as a namespace in message mode notifies it. Preview is
+// short (domain.MaxPreviewRunes) and raw; Kind lets the client label attachments and
+// cards in its own language.
+type MessagePush struct {
+	RoomID     string
+	RoomName   string
+	EventID    string
+	SenderID   string
+	SenderName string
+	Kind       domain.PreviewKind
+	Preview    string
 }
 
 // Digest is the per-recipient summary a coalescing window produces. Counts only,
@@ -47,7 +62,25 @@ type Dispatcher struct {
 	devices        out.DeviceStore
 	sender         Sender
 	coalesceWindow time.Duration
+
+	// Message mode (optional, see WithMessageMode).
+	namespaces out.NamespaceStore
+	users      out.UserStore
+	modesMu    sync.Mutex
+	modes      map[string]cachedMode
 }
+
+type cachedMode struct {
+	mode  domain.PushMode
+	until time.Time
+}
+
+// modeTTL bounds how long a namespace's push mode is cached; a change applies
+// within this delay, without a restart.
+const modeTTL = 30 * time.Second
+
+// messageSendConcurrency bounds provider calls for one message.
+const messageSendConcurrency = 8
 
 func NewDispatcher(queue out.PushQueue, presence out.PresenceStore, devices out.DeviceStore, sender Sender, coalesceWindow time.Duration) *Dispatcher {
 	return &Dispatcher{
@@ -59,15 +92,119 @@ func NewDispatcher(queue out.PushQueue, presence out.PresenceStore, devices out.
 	}
 }
 
-// Dispatch enqueues event for every recipientID's next batched push. Non-blocking:
-// the Redis calls run on a spawned goroutine, so a slow/unavailable Redis never
-// delays the caller (the event-send HTTP response).
+// WithMessageMode lets namespaces choose domain.PushMessage. Without it, every
+// namespace gets digests.
+func (d *Dispatcher) WithMessageMode(namespaces out.NamespaceStore, users out.UserStore) *Dispatcher {
+	d.namespaces, d.users = namespaces, users
+	d.modes = map[string]cachedMode{}
+	return d
+}
+
+// Dispatch notifies every recipientID of event, per its namespace's push mode.
+// Non-blocking: lookups and Redis calls run on a spawned goroutine, so a slow
+// dependency never delays the caller (the event-send HTTP response).
 func (d *Dispatcher) Dispatch(event *domain.Event, recipientIDs []string, roomName string) {
 	if len(recipientIDs) == 0 {
 		return
 	}
-	item := out.PushQueueItem{RoomID: event.RoomID, RoomName: roomName}
-	go d.enqueueAll(context.Background(), event.ID, recipientIDs, item)
+	go func() {
+		ctx := context.Background()
+		if d.mode(ctx, event.NamespaceID) == domain.PushMessage {
+			d.sendMessage(ctx, event, recipientIDs, roomName)
+			return
+		}
+		item := out.PushQueueItem{RoomID: event.RoomID, RoomName: roomName}
+		d.enqueueAll(ctx, event.ID, recipientIDs, item)
+	}()
+}
+
+// mode returns the namespace's push mode, cached for modeTTL. Lookup failures fall
+// back to digest, which never sends content.
+func (d *Dispatcher) mode(ctx context.Context, namespaceID string) domain.PushMode {
+	if d.namespaces == nil || namespaceID == "" {
+		return domain.PushDigest
+	}
+	d.modesMu.Lock()
+	cached, ok := d.modes[namespaceID]
+	d.modesMu.Unlock()
+	if ok && time.Now().Before(cached.until) {
+		return cached.mode
+	}
+	mode := domain.PushDigest
+	if ns, err := d.namespaces.GetByID(ctx, namespaceID); err != nil {
+		slog.Warn("push: namespace lookup failed, using digest", "namespace_id", namespaceID, "error", err)
+	} else if ns.PushMode == domain.PushMessage {
+		mode = domain.PushMessage
+	}
+	d.modesMu.Lock()
+	d.modes[namespaceID] = cachedMode{mode: mode, until: time.Now().Add(modeTTL)}
+	d.modesMu.Unlock()
+	return mode
+}
+
+// sendMessage pushes one message with its preview, right away, to every recipient
+// who is not connected. Events that are not messages (reactions, plugin state,
+// commands, agent status) are not pushed in message mode.
+func (d *Dispatcher) sendMessage(ctx context.Context, event *domain.Event, recipientIDs []string, roomName string) {
+	kind, preview, ok := domain.MessagePreview(event)
+	if !ok {
+		return
+	}
+	offline := make([]string, 0, len(recipientIDs))
+	for _, userID := range recipientIDs {
+		present, err := d.presence.IsPresent(ctx, userID)
+		if err != nil {
+			// Fail open, as in flush: a redundant push beats a missed one.
+			slog.Warn("push: presence check failed, sending anyway", "user_id", userID, "error", err)
+		}
+		if err != nil || !present {
+			offline = append(offline, userID)
+		}
+	}
+	if len(offline) == 0 {
+		return
+	}
+	tokens, err := d.devices.ListPushTokensByUserIDs(ctx, offline)
+	if err != nil {
+		slog.Error("push: list push tokens", "users", len(offline), "error", err)
+		return
+	}
+	if len(tokens) == 0 {
+		return
+	}
+	msg := MessagePush{
+		RoomID: event.RoomID, RoomName: roomName, EventID: event.ID,
+		SenderID: event.SenderID, SenderName: d.senderName(ctx, event.SenderID),
+		Kind: kind, Preview: preview,
+	}
+	slots := make(chan struct{}, messageSendConcurrency)
+	var wg sync.WaitGroup
+	for _, t := range tokens {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func(t domain.DevicePushToken) {
+			defer func() { <-slots; wg.Done() }()
+			if err := d.sender.SendMessage(ctx, t.PushToken, msg); err != nil {
+				slog.Warn("push: message delivery failed", "device_id", t.DeviceID, "user_id", t.UserID, "error", err)
+			}
+		}(t)
+	}
+	wg.Wait()
+}
+
+func (d *Dispatcher) senderName(ctx context.Context, userID string) string {
+	if d.users == nil {
+		return ""
+	}
+	u, err := d.users.GetByID(ctx, userID)
+	if err != nil {
+		slog.Warn("push: sender lookup failed", "user_id", userID, "error", err)
+		return ""
+	}
+	if u.DisplayName != "" {
+		return u.DisplayName
+	}
+	return u.Username
 }
 
 func (d *Dispatcher) enqueueAll(ctx context.Context, eventID string, recipientIDs []string, item out.PushQueueItem) {

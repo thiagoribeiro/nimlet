@@ -3,6 +3,8 @@ package usecase_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -231,21 +233,40 @@ func TestSync_WakeDuringFirstQuery_IsNotLost(t *testing.T) {
 	assert.Less(t, time.Since(start), time.Second, "wake-up during the first query was lost")
 }
 
-// Presence is refreshed at most once per presenceRefresh, not on every /sync.
-func TestSync_PresenceTouchIsThrottled(t *testing.T) {
-	touches := 0
-	presence := &testkit.MockPresenceStore{TouchFn: func(context.Context, string) error { touches++; return nil }}
+// Every /sync begins presence with its effective timeout and ends it when it
+// returns, also when the client aborts the request (backgrounded app).
+func TestSync_PresenceBeginsAndEndsWithEachRequest(t *testing.T) {
+	var calls []string
+	var mu sync.Mutex
+	record := func(c string) { mu.Lock(); calls = append(calls, c); mu.Unlock() }
+	presence := &testkit.MockPresenceStore{
+		BeginFn: func(_ context.Context, userID string, timeout time.Duration) error {
+			record(fmt.Sprintf("begin %s %s", userID, timeout))
+			return nil
+		},
+		EndFn: func(ctx context.Context, userID string) error {
+			if ctx.Err() != nil {
+				t.Error("End must not run on a canceled context")
+			}
+			record("end " + userID)
+			return nil
+		},
+	}
 	store := &testkit.MockEventStore{GetVisibleFn: func(context.Context, string, int64, int) ([]*domain.Event, error) {
-		return []*domain.Event{makeEvent(1)}, nil
+		return nil, nil
 	}}
 	svc := usecase.NewSyncService(store, noLargeRooms(), nimsync.NewWaiterRegistry(), presence)
-	for range 5 {
-		_, err := svc.Sync(context.Background(), in.SyncCmd{UserID: "u1"})
-		require.NoError(t, err)
-	}
-	_, err := svc.Sync(context.Background(), in.SyncCmd{UserID: "u2"})
+
+	_, err := svc.Sync(context.Background(), in.SyncCmd{UserID: "u1", TimeoutMs: 10})
 	require.NoError(t, err)
-	assert.Equal(t, 2, touches, "once per user within the refresh window")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(20 * time.Millisecond); cancel() }()
+	_, _ = svc.Sync(ctx, in.SyncCmd{UserID: "u2", TimeoutMs: 90_000}) // capped at 60 s, aborted
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, []string{"begin u1 10ms", "end u1", "begin u2 1m0s", "end u2"}, calls)
 }
 
 // A wake-up shortly before the wait deadline must still re-query successfully even if the

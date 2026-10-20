@@ -23,10 +23,6 @@ const (
 	// long-poll timeout, still delivers); which events a sync returns never depends on
 	// it, because EventStore.GetVisible resolves large rooms itself.
 	largeRoomCacheTTL = 10 * time.Second
-
-	// presenceRefresh: a user's presence key (90s TTL in Redis) is refreshed at most this
-	// often, instead of one Redis write per /sync.
-	presenceRefresh = 30 * time.Second
 )
 
 type syncService struct {
@@ -35,7 +31,6 @@ type syncService struct {
 	registry    *nimsync.WaiterRegistry
 	presence    out.PresenceStore
 	largeRooms  *ttlCache[[]string]
-	touched     *ttlCache[struct{}]
 }
 
 func NewSyncService(events out.EventStore, memberships out.MembershipStore, registry *nimsync.WaiterRegistry, presence out.PresenceStore) in.SyncService {
@@ -45,7 +40,6 @@ func NewSyncService(events out.EventStore, memberships out.MembershipStore, regi
 		registry:    registry,
 		presence:    presence,
 		largeRooms:  newTTLCache[[]string](largeRoomCacheTTL),
-		touched:     newTTLCache[struct{}](presenceRefresh),
 	}
 }
 
@@ -56,15 +50,25 @@ func NewSyncService(events out.EventStore, memberships out.MembershipStore, regi
 // would sit out the whole timeout. With the buffered(1) channel already in place, such a
 // wake-up is kept and the select below returns at once.
 func (s *syncService) Sync(ctx context.Context, cmd in.SyncCmd) (*in.SyncResult, error) {
-	// Best-effort: presence only gates whether push delivery skips this user, so a
-	// failure here must never fail the /sync request itself.
-	if _, fresh := s.touched.get(cmd.UserID); !fresh {
-		if err := s.presence.Touch(ctx, cmd.UserID); err != nil {
-			slog.WarnContext(ctx, "sync: touch presence", "user_id", cmd.UserID, "error", err)
-		} else {
-			s.touched.put(cmd.UserID, struct{}{})
-		}
+	timeout := time.Duration(cmd.TimeoutMs) * time.Millisecond
+	if timeout <= 0 {
+		timeout = defaultSyncTimeout
 	}
+	if timeout > maxSyncTimeout {
+		timeout = maxSyncTimeout
+	}
+
+	// Best-effort: presence only gates whether push delivery skips this user, so a
+	// failure here must never fail the /sync request itself. End runs even when the
+	// client aborts (backgrounded app), so presence ends a grace period later.
+	if err := s.presence.Begin(ctx, cmd.UserID, timeout); err != nil {
+		slog.WarnContext(ctx, "sync: begin presence", "user_id", cmd.UserID, "error", err)
+	}
+	defer func() {
+		if err := s.presence.End(context.WithoutCancel(ctx), cmd.UserID); err != nil {
+			slog.WarnContext(ctx, "sync: end presence", "user_id", cmd.UserID, "error", err)
+		}
+	}()
 
 	largeRoomIDs, err := s.largeRoomsFor(ctx, cmd.UserID)
 	if err != nil {
@@ -79,14 +83,6 @@ func (s *syncService) Sync(ctx context.Context, cmd in.SyncCmd) (*in.SyncResult,
 	}
 	if len(events) > 0 {
 		return result(cmd.Since, events), nil
-	}
-
-	timeout := time.Duration(cmd.TimeoutMs) * time.Millisecond
-	if timeout <= 0 {
-		timeout = defaultSyncTimeout
-	}
-	if timeout > maxSyncTimeout {
-		timeout = maxSyncTimeout
 	}
 
 	// The deadline bounds the wait only. The re-query below uses the request context: a

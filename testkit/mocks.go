@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/thiagoribeiro/nimlet/internal/domain"
 	"github.com/thiagoribeiro/nimlet/internal/port/out"
@@ -64,16 +65,25 @@ func (m *MockDeviceStore) ListPushTokensByUserIDs(ctx context.Context, userIDs [
 // MockPresenceStore defaults to "always absent" so push-path tests don't need to wire
 // it up unless they specifically care about presence gating.
 type MockPresenceStore struct {
-	TouchFn     func(ctx context.Context, userID string) error
+	BeginFn     func(ctx context.Context, userID string, timeout time.Duration) error
+	EndFn       func(ctx context.Context, userID string) error
 	IsPresentFn func(ctx context.Context, userID string) (bool, error)
 }
 
-func (m *MockPresenceStore) Touch(ctx context.Context, userID string) error {
-	if m.TouchFn != nil {
-		return m.TouchFn(ctx, userID)
+func (m *MockPresenceStore) Begin(ctx context.Context, userID string, timeout time.Duration) error {
+	if m.BeginFn != nil {
+		return m.BeginFn(ctx, userID, timeout)
 	}
 	return nil
 }
+
+func (m *MockPresenceStore) End(ctx context.Context, userID string) error {
+	if m.EndFn != nil {
+		return m.EndFn(ctx, userID)
+	}
+	return nil
+}
+
 func (m *MockPresenceStore) IsPresent(ctx context.Context, userID string) (bool, error) {
 	if m.IsPresentFn != nil {
 		return m.IsPresentFn(ctx, userID)

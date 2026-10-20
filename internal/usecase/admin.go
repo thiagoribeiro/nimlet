@@ -132,6 +132,17 @@ func (s *adminService) SetNamespaceRegistration(ctx context.Context, slug string
 	return s.namespace(ctx, slug)
 }
 
+func (s *adminService) SetNamespacePushMode(ctx context.Context, slug string, mode domain.PushMode) (*domain.Namespace, error) {
+	ns, err := s.namespace(ctx, slug)
+	if err == nil {
+		err = s.st.Namespaces.SetPushMode(ctx, ns.ID, mode)
+	}
+	if err := s.audit(ctx, "namespace push mode "+string(mode), nsID(ns), slug, err); err != nil {
+		return nil, err
+	}
+	return s.namespace(ctx, slug)
+}
+
 func (s *adminService) members() membershipOps {
 	return membershipOps{tx: s.st.Tx, rooms: s.st.Rooms, memberships: s.st.Memberships}
 }

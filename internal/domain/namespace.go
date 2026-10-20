@@ -27,11 +27,31 @@ type Namespace struct {
 	Slug              string
 	Status            NamespaceStatus
 	AllowRegistration bool // public POST /register is accepted for this namespace
+	PushMode          PushMode
 	CreatedAt         time.Time
 	DisabledAt        *time.Time
 }
 
 func (n *Namespace) IsActive() bool { return n.Status == NamespaceActive }
+
+// PushMode is how a namespace's offline members are notified.
+type PushMode string
+
+const (
+	// PushDigest coalesces events into one push with room names and counts only.
+	PushDigest PushMode = "digest"
+	// PushMessage sends one push per message with a short preview of its content.
+	PushMessage PushMode = "message"
+)
+
+// ParsePushMode validates a push mode name.
+func ParsePushMode(s string) (PushMode, error) {
+	switch m := PushMode(s); m {
+	case PushDigest, PushMessage:
+		return m, nil
+	}
+	return "", invalidField("push mode", "must be digest or message, got %q", s)
+}
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 

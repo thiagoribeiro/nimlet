@@ -731,6 +731,15 @@ already gets the event live. Like the wake-up bus, presence is best-effort: a lo
 or an expired key fails open (send the push anyway), never silent (skip a push that should
 have fired).
 
+**Modes.** Each namespace chooses how its offline members are notified
+(`nimlet namespace push <slug> <digest|message>`, default `digest`; a change applies
+within 30 seconds):
+
+- `digest` — batched counts, never message content (below).
+- `message` — one push per message with a short preview, like most chat apps.
+
+### Digest mode
+
 **Per-person batching.** Pushes are batched per recipient, not per event — someone with unread
 messages across several rooms gets one push, not one per message. Each send appends to a
 Redis-backed pending list for that recipient and races to claim (`SET NX`) a 5-second flush
@@ -748,6 +757,22 @@ message content:
 
 No message body ever passes through FCM/Google's servers. The push exists to wake the client
 up; real content is always fetched via `/sync` once the app opens.
+
+### Message mode
+
+Each message is pushed right away, without batching, to every recipient who is not present.
+Only messages notify: `m.room.message`, `m.room.attachment` and new BRIAN cards
+(`m.ui.message`). Reactions, plugin state updates, commands and agent activity do not.
+The push is data-only with high Android priority, so a device in Doze shows it promptly:
+
+```json
+{"type":"message","room_id":"...","room_name":"...","event_id":"...",
+ "sender_id":"...","sender_name":"Alice","kind":"text","preview":"see you at 8?"}
+```
+
+`kind` is `text`, `image`, `file` or `card`, so clients can label attachments and cards in
+their own language. `preview` is whitespace-collapsed and cut at 120 characters.
+**The preview transits FCM/Google's servers**; use `digest` where that is not acceptable.
 
 Configure `NIMLET_FCM_CREDENTIALS_FILE` to enable delivery (unset means push is a no-op —
 tokens are still accepted and stored, they're just never used). Currently Android-only.
@@ -1009,7 +1034,7 @@ go test -tags integration -race -count=1 ./test/integration/...
 - Redis Pub/Sub cross-instance wake-up (partitioned, 256 channels)
 - large-room fan-out (≥ 1000 members: single room-level publish, pull-based sync)
 - database migrations (embedded, auto-applied at startup)
-- push notifications (FCM HTTP v1, presence-gated, per-recipient batched digests — Android)
+- push notifications (FCM HTTP v1, presence-gated; per-namespace batched digests or per-message previews — Android)
 - isolated namespaces (multi-tenant on one instance; namespace-scoped login, AppServices and media)
 - admin CLI (`nimlet namespace|user|room`): direct DB access, audited, no HTTP admin API
 

@@ -65,8 +65,13 @@ type sendRequest struct {
 }
 
 type fcmMessage struct {
-	Token string            `json:"token"`
-	Data  map[string]string `json:"data"`
+	Token   string            `json:"token"`
+	Data    map[string]string `json:"data"`
+	Android *androidConfig    `json:"android,omitempty"`
+}
+
+type androidConfig struct {
+	Priority string `json:"priority"`
 }
 
 // Send delivers digest to token as an FCM data-only message — no "notification"
@@ -78,16 +83,39 @@ func (s *Sender) Send(ctx context.Context, token string, digest push.Digest) err
 		return fmt.Errorf("fcm: encode digest rooms: %w", err)
 	}
 
-	body, err := json.Marshal(sendRequest{
-		Message: fcmMessage{
-			Token: token,
-			Data: map[string]string{
-				"type":        "digest",
-				"rooms":       string(roomsJSON),
-				"total_count": strconv.Itoa(digest.TotalCount),
-			},
+	return s.post(ctx, fcmMessage{
+		Token: token,
+		Data: map[string]string{
+			"type":        "digest",
+			"rooms":       string(roomsJSON),
+			"total_count": strconv.Itoa(digest.TotalCount),
 		},
 	})
+}
+
+// SendMessage delivers one message as a data-only FCM message with high Android
+// priority, so a device in Doze shows it promptly. The client renders it; the
+// preview is the only message content that leaves the server (namespaces in
+// message mode).
+func (s *Sender) SendMessage(ctx context.Context, token string, msg push.MessagePush) error {
+	return s.post(ctx, fcmMessage{
+		Token: token,
+		Data: map[string]string{
+			"type":        "message",
+			"room_id":     msg.RoomID,
+			"room_name":   msg.RoomName,
+			"event_id":    msg.EventID,
+			"sender_id":   msg.SenderID,
+			"sender_name": msg.SenderName,
+			"kind":        string(msg.Kind),
+			"preview":     msg.Preview,
+		},
+		Android: &androidConfig{Priority: "HIGH"},
+	})
+}
+
+func (s *Sender) post(ctx context.Context, message fcmMessage) error {
+	body, err := json.Marshal(sendRequest{Message: message})
 	if err != nil {
 		return fmt.Errorf("fcm: encode request: %w", err)
 	}

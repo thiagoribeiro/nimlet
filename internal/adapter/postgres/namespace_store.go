@@ -19,11 +19,11 @@ func NewNamespaceStore(pool *pgxpool.Pool) out.NamespaceStore {
 	return &namespaceStore{pool: pool}
 }
 
-const namespaceColumns = `id, slug, status, allow_registration, created_at, disabled_at`
+const namespaceColumns = `id, slug, status, allow_registration, push_mode, created_at, disabled_at`
 
 func scanNamespace(row rowScanner) (*domain.Namespace, error) {
 	n := &domain.Namespace{}
-	if err := row.Scan(&n.ID, &n.Slug, &n.Status, &n.AllowRegistration, &n.CreatedAt, &n.DisabledAt); err != nil {
+	if err := row.Scan(&n.ID, &n.Slug, &n.Status, &n.AllowRegistration, &n.PushMode, &n.CreatedAt, &n.DisabledAt); err != nil {
 		return nil, err
 	}
 	return n, nil
@@ -98,6 +98,18 @@ func (s *namespaceStore) SetStatus(ctx context.Context, id string, status domain
 			return fmt.Errorf("set namespace status: database role lacks the privilege: %w", domain.ErrPermissionDenied)
 		}
 		return fmt.Errorf("postgres: set namespace status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (s *namespaceStore) SetPushMode(ctx context.Context, id string, mode domain.PushMode) error {
+	q := querierFrom(ctx, s.pool)
+	tag, err := q.Exec(ctx, `UPDATE namespaces SET push_mode = $2 WHERE id = $1`, id, string(mode))
+	if err != nil {
+		return fmt.Errorf("postgres: set namespace push mode: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrNotFound

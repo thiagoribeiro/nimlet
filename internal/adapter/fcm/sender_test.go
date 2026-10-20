@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/thiagoribeiro/nimlet/internal/domain"
 	"github.com/thiagoribeiro/nimlet/internal/push"
 )
 
@@ -72,4 +73,37 @@ func TestSender_Send_NonOKStatusReturnsError(t *testing.T) {
 	err := sender.Send(context.Background(), "bad-token", push.Digest{TotalCount: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "403")
+}
+
+func TestSender_SendMessage_DataOnlyWithHighPriority(t *testing.T) {
+	var raw map[string]any
+	sender := testSender(t, func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&raw))
+		w.WriteHeader(http.StatusOK)
+	})
+
+	err := sender.SendMessage(context.Background(), "device-token-1", push.MessagePush{
+		RoomID: "room1", RoomName: "Família", EventID: "evt1", SenderID: "alice",
+		SenderName: "Alice", Kind: domain.PreviewText, Preview: "oi",
+	})
+	require.NoError(t, err)
+
+	message := raw["message"].(map[string]any)
+	assert.Equal(t, "device-token-1", message["token"])
+	assert.Equal(t, map[string]any{"priority": "HIGH"}, message["android"])
+	assert.NotContains(t, message, "notification", "the client renders the notification")
+	assert.Equal(t, map[string]any{
+		"type": "message", "room_id": "room1", "room_name": "Família", "event_id": "evt1",
+		"sender_id": "alice", "sender_name": "Alice", "kind": "text", "preview": "oi",
+	}, message["data"])
+}
+
+func TestSender_Send_DigestKeepsDefaultPriority(t *testing.T) {
+	var raw map[string]any
+	sender := testSender(t, func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&raw))
+		w.WriteHeader(http.StatusOK)
+	})
+	require.NoError(t, sender.Send(context.Background(), "t", push.Digest{TotalCount: 1}))
+	assert.NotContains(t, raw["message"].(map[string]any), "android")
 }

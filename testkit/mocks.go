@@ -438,6 +438,17 @@ func (m *MockNamespaceStore) SetStatus(ctx context.Context, id string, status do
 	return nil
 }
 
+func (m *MockNamespaceStore) SetPushMode(ctx context.Context, id string, mode domain.PushMode) error {
+	n, err := m.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	n.PushMode = mode
+	m.mu.Unlock()
+	return nil
+}
+
 func (m *MockNamespaceStore) SetAllowRegistration(ctx context.Context, id string, allow bool) error {
 	n, err := m.GetByID(ctx, id)
 	if err != nil {

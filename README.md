@@ -724,10 +724,13 @@ For clients that aren't actively polling `/sync` (app backgrounded or killed), N
 deliver a mobile push notification via FCM HTTP v1, authenticated directly with a Firebase
 service-account key — no third-party push relay in the delivery path.
 
-**Presence.** Every `/sync` call touches an ephemeral Redis key
-(`presence:{userID}`, TTL 90s) marking that user as actively connected. A message send only
-queues a push for recipients who are *not* currently present — anyone with an open `/sync`
-already gets the event live. Like the wake-up bus, presence is best-effort: a lookup failure
+**Presence.** Each `/sync` marks its user as connected in an ephemeral Redis key
+(`presence:{userID}`) for the length of the long-poll, and when the request returns, or the
+client aborts it, the mark lasts only a 10-second grace period (time for a connected client
+to open its next long-poll). A user who closes the app is pushed within seconds. Pushes skip
+recipients who are present: anyone with an open `/sync` already gets the event live.
+Presence is per user, so one connected device silences pushes to all of them; when two
+devices are connected and one leaves, at most one redundant push may go out. Like the wake-up bus, presence is best-effort: a lookup failure
 or an expired key fails open (send the push anyway), never silent (skip a push that should
 have fired).
 

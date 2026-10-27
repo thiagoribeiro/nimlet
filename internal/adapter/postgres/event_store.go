@@ -86,7 +86,9 @@ func (s *eventStore) Create(ctx context.Context, e *domain.Event, fanOut bool) (
 			FROM ev
 			JOIN room_memberships m ON m.room_id = $5 AND m.state = 'join'
 			WHERE $10
-			ON CONFLICT DO NOTHING
+			-- No ON CONFLICT: stream_pos was just allocated and a user has one membership
+			-- per room, so a duplicate can't happen, and speculative insertion into the
+			-- partitioned table costs ~4x a plain insert.
 			RETURNING user_id
 		), done AS (
 			DELETE FROM stream_inflight
@@ -192,6 +194,63 @@ func SweepStreamInflight(ctx context.Context, pool *pgxpool.Pool) (int64, error)
 // docs/benchmarks.md.) UNION (not ALL) dedupes events of a room that crossed the
 // large-room threshold and so appear in both sources. Results never exceed the read ceiling.
 func (s *eventStore) GetVisible(ctx context.Context, userID string, sincePos int64, limit int) ([]*domain.Event, error) {
+	return waitPastCeiling(ctx, func() ([]*domain.Event, bool, error) {
+		return s.getVisibleOnce(ctx, userID, sincePos, limit)
+	})
+}
+
+// ceilingWaitMax bounds how long GetVisible waits for in-flight writes that hold back
+// committed events it would otherwise return. Such writes finish in milliseconds; one that
+// takes longer than this is treated as stuck, as readCeilingCTE eventually does.
+const ceilingWaitMax = 500 * time.Millisecond
+
+// waitPastCeiling re-runs query while it finds nothing but reports held: committed events
+// for the user sit above the read ceiling, behind a write still in flight. Returning empty
+// then would lose a wake-up: the event's notification already reached this reader (whose
+// re-query came back empty), and the write it waited on wakes only its own room.
+func waitPastCeiling(ctx context.Context, query func() ([]*domain.Event, bool, error)) ([]*domain.Event, error) {
+	deadline := time.Now().Add(ceilingWaitMax)
+	backoff := time.Millisecond
+	for {
+		events, held, err := query()
+		if err != nil || len(events) > 0 || !held || time.Now().After(deadline) {
+			return events, err
+		}
+		select {
+		case <-ctx.Done():
+			return events, nil
+		case <-time.After(backoff):
+		}
+		backoff = min(2*backoff, 50*time.Millisecond)
+	}
+}
+
+// heldSQL is true when committed events visible to user lie above the read ceiling. The
+// callers evaluate it only for an empty page, and it probes no table unless a write is in
+// flight (otherwise the ceiling is max bigint and nothing can be held back).
+func heldSQL(user string) string {
+	// Aliases are prefixed: this is spliced into queries whose own aliases (r, m, e, ...)
+	// must not shadow user's table.
+	return `((SELECT pos FROM ceiling) < 9223372036854775807 AND
+		(EXISTS (SELECT 1 FROM event_visibility hv
+		         WHERE hv.user_id = ` + user + ` AND hv.stream_pos > (SELECT pos FROM ceiling))
+		 OR EXISTS (SELECT 1 FROM room_memberships hm
+		            JOIN rooms hr ON hr.id = hm.room_id
+		            JOIN events he ON he.room_id = hm.room_id AND he.stream_pos > (SELECT pos FROM ceiling)
+		            WHERE hm.user_id = ` + user + ` AND hm.state = 'join' AND hr.member_count >= ` + largeRoomThresholdSQL + `)))`
+}
+
+// eventColumnsOrZero selects the event columns of the joined e / u, as zero values when the
+// outer join found no event (an empty page still returns its held flag).
+const eventColumnsOrZero = `COALESCE(e.id, ''), COALESCE(e.stream_pos, 0), COALESCE(e.room_seq, 0),
+		       COALESCE(e.room_id, ''), COALESCE(e.sender_id, ''), COALESCE(u.display_name, ''),
+		       COALESCE(e.event_type, ''), COALESCE(e.content, '{}'::jsonb), COALESCE(e.txn_key, ''),
+		       COALESCE(e.created_at, 'epoch'::timestamptz)`
+
+// zeroEventColumns pads rows that carry no event to the event columns' types.
+const zeroEventColumns = `''::text, 0::bigint, 0::bigint, ''::text, ''::text, ''::text, ''::text, '{}'::jsonb, ''::text, 'epoch'::timestamptz`
+
+func (s *eventStore) getVisibleOnce(ctx context.Context, userID string, sincePos int64, limit int) ([]*domain.Event, bool, error) {
 	q := querierFrom(ctx, s.pool)
 	rows, err := q.Query(ctx, `
 		WITH `+readCeilingCTE+`,
@@ -215,20 +274,37 @@ func (s *eventStore) GetVisible(ctx context.Context, userID string, sincePos int
 			 WHERE m.user_id = $1 AND m.state = 'join' AND r.member_count >= `+largeRoomThresholdSQL+`)
 			ORDER BY 1
 			LIMIT $3
+		),
+		held AS (
+			SELECT NOT EXISTS (SELECT 1 FROM page) AND `+heldSQL("$1")+` AS held
 		)
-		SELECT e.id, e.stream_pos, e.room_seq, e.room_id, e.sender_id, u.display_name,
-		       e.event_type, e.content, e.txn_key, e.created_at
-		FROM page p
-		JOIN events e ON e.stream_pos = p.stream_pos
-		JOIN users  u ON u.id = e.sender_id
+		SELECT h.held, `+eventColumnsOrZero+`
+		FROM held h
+		LEFT JOIN (page p
+		           JOIN events e ON e.stream_pos = p.stream_pos
+		           JOIN users  u ON u.id = e.sender_id) ON true
 		ORDER BY e.stream_pos`,
 		userID, sincePos, limit,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: get visible events: %w", err)
+		return nil, false, fmt.Errorf("postgres: get visible events: %w", err)
 	}
 	defer rows.Close()
-	return scanEvents(rows)
+	var events []*domain.Event
+	var held bool
+	for rows.Next() {
+		e := &domain.Event{}
+		if err := rows.Scan(&held,
+			&e.ID, &e.StreamPos, &e.RoomSeq, &e.RoomID, &e.SenderID, &e.SenderDisplayName,
+			&e.EventType, &e.Content, &e.TxnKey, &e.CreatedAt,
+		); err != nil {
+			return nil, false, fmt.Errorf("postgres: scan event: %w", err)
+		}
+		if e.ID != "" {
+			events = append(events, e)
+		}
+	}
+	return events, held, rows.Err()
 }
 
 // GetByRoom pages a room's history by room_seq: after fromSeq (dir "f") or before it

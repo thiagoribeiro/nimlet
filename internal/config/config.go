@@ -48,6 +48,14 @@ type DBConfig struct {
 	// AutoMigrate applies pending migrations at server startup (default true). Turn it off
 	// when the server's role has no DDL rights and `nimlet migrate up` runs separately.
 	AutoMigrate bool
+	// Sends are written in group-committed batches and concurrent /sync queries run as one
+	// statement (postgres.NewBatchedEventStore). MAX 1 disables either.
+	EventBatchMax     int // events per write transaction (default 64)
+	EventBatchWaitUs  int // µs a write batch waits for more events after its first (default 0)
+	EventBatchWorkers int // write batches in flight (default 4)
+	SyncReadMax       int // /sync queries per statement (default 64)
+	SyncReadWaitUs    int // µs a read group waits for more queries after its first (default 0)
+	SyncReadWorkers   int // read groups in flight (default 8)
 }
 
 type RedisConfig struct {
@@ -153,6 +161,13 @@ func LoadDB() (*DBConfig, error) {
 		DSN:         dsn,
 		MaxConns:    int32(envInt(&errs, "NIMLET_DB_MAX_CONNS", defaultDBMaxConns())),
 		AutoMigrate: envOr("NIMLET_AUTO_MIGRATE", "true") != "false",
+
+		EventBatchMax:     envInt(&errs, "NIMLET_EVENT_BATCH_MAX", 64),
+		EventBatchWaitUs:  envInt(&errs, "NIMLET_EVENT_BATCH_WAIT_US", 0),
+		EventBatchWorkers: envInt(&errs, "NIMLET_EVENT_BATCH_WORKERS", 4),
+		SyncReadMax:       envInt(&errs, "NIMLET_SYNC_READ_MAX", 64),
+		SyncReadWaitUs:    envInt(&errs, "NIMLET_SYNC_READ_WAIT_US", 0),
+		SyncReadWorkers:   envInt(&errs, "NIMLET_SYNC_READ_WORKERS", 8),
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err

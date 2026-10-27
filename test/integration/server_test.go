@@ -89,7 +89,13 @@ func newTestEnv(t *testing.T, asReg *appservice.Registry) *testEnv {
 	sessionStore := postgres.NewSessionStore(pool)
 	roomStore := postgres.NewRoomStore(pool)
 	membershipStore := postgres.NewMembershipStore(pool)
-	eventStore := postgres.NewEventStore(pool)
+	// Grouped writes and reads, as in production (internal/app): every HTTP-level test
+	// then runs through the batched paths.
+	eventStore := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
+		Writes: postgres.GroupLimits{MaxItems: 64, Workers: 4},
+		Reads:  postgres.GroupLimits{MaxItems: 64, Workers: 8},
+	})
+	t.Cleanup(eventStore.Close)
 	namespaceStore := postgres.NewNamespaceStore(pool)
 	txr := postgres.NewTransactor(pool)
 	bus := redis.NewBus(redisClient, 4)

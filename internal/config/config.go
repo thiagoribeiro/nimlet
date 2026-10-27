@@ -66,6 +66,10 @@ type RedisConfig struct {
 
 type AuthConfig struct {
 	HMACSecret []byte // must be 32+ bytes
+	// CacheTTLMs: how long an instance reuses a session lookup (default 1000; 0 disables).
+	// Revoking a session or disabling a device, user or namespace reaches the other
+	// instances within this time.
+	CacheTTLMs int
 }
 
 type SyncConfig struct {
@@ -125,6 +129,7 @@ func Load() (*Config, error) {
 		},
 		Auth: AuthConfig{
 			HMACSecret: []byte(secret),
+			CacheTTLMs: envInt(&errs, "NIMLET_AUTH_CACHE_TTL_MS", 1000),
 		},
 		Sync: SyncConfig{
 			Partitions: envInt(&errs, "NIMLET_SYNC_PARTITIONS", 256),

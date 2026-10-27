@@ -18,6 +18,7 @@ import (
 	"github.com/thiagoribeiro/nimlet/internal/adapter/postgres"
 	"github.com/thiagoribeiro/nimlet/internal/adapter/redis"
 	s3adapter "github.com/thiagoribeiro/nimlet/internal/adapter/s3"
+	"github.com/thiagoribeiro/nimlet/internal/adapter/sessioncache"
 	"github.com/thiagoribeiro/nimlet/internal/appservice"
 	appcfg "github.com/thiagoribeiro/nimlet/internal/config"
 	"github.com/thiagoribeiro/nimlet/internal/cursor"
@@ -145,7 +146,7 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 	// --- Adapters ---
 	userStore := postgres.NewUserStore(pool)
 	deviceStore := postgres.NewDeviceStore(pool)
-	sessionStore := postgres.NewSessionStore(pool)
+	sessionStore := sessioncache.New(postgres.NewSessionStore(pool), time.Duration(cfg.Auth.CacheTTLMs)*time.Millisecond)
 	roomStore := postgres.NewRoomStore(pool)
 	membershipStore := postgres.NewMembershipStore(pool)
 	eventStore := postgres.NewEventStore(pool)

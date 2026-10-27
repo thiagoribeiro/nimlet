@@ -334,8 +334,10 @@ Rules:
 - **Registration is off by default.** New namespaces do not accept public `/register`
   (403 `REGISTRATION_CLOSED`) until an operator enables it. Accounts can also be created with the
   admin CLI.
-- **Disabling a namespace stops it at once.** Login, every authenticated request (including
-  `/sync`) and its AppServices stop working, and the other namespaces are unaffected.
+- **Disabling a namespace stops it within a second.** Login, every authenticated request
+  (including `/sync`) and its AppServices stop working, and the other namespaces are unaffected.
+  Instances reuse a session lookup for up to `NIMLET_AUTH_CACHE_TTL_MS` (1s), so disabling a
+  namespace, user or device, or revoking a session, takes that long to reach every instance.
 - **Infrastructure is shared.** Namespaces share Postgres, Redis and the process. This is
   isolation of data and authorization, not of resources or failures.
 
@@ -900,6 +902,7 @@ All configuration is via environment variables.
 | `NIMLET_AUTO_MIGRATE` | `true` | Apply pending migrations at server startup; set `false` when the server's DB role has no DDL rights |
 | `NIMLET_DB_MAX_CONNS` | `max(50, NumCPU×4)` | Max DB pool connections per instance |
 | `NIMLET_AUTH_HMAC_SECRET` | *(required, ≥32 chars)* | Secret for HMAC token signing |
+| `NIMLET_AUTH_CACHE_TTL_MS` | `1000` | How long an instance reuses a session lookup; revocations and disables reach other instances within this time (`0` disables the cache) |
 | `NIMLET_REDIS_ADDR` | `localhost:6379` | Redis address |
 | `NIMLET_REDIS_PASSWORD` | | Redis password |
 | `NIMLET_REDIS_DB` | `0` | Redis database index |

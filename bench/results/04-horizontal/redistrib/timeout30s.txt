@@ -1,0 +1,16 @@
+setup: 2000 users in 100 rooms ready in 1ms
+listening: 2000 listeners caught up in 944ms
+warmup: 10s at 20/s
+
+step 1: target=20/s achieved=20.0/s acked=9599 failed=0 retries=0 shed=0 delivered=191980/191980 (100.00%) PASS
+  send        n=9599    p50=3.74ms     p95=4.38ms     p99=7.11ms     max=86.1ms
+  delivery    n=191980  p50=17.55ms    p95=18.7ms     p99=25.04ms    max=108.15ms
+
+scenario: members=2000 rooms=100 listeners=2000 senders=100 steps=[20] duration=8m0s
+capacity: 20 msg/s (highest passing step, slo delivery p99 < 1m0s)
+sends: attempted=9798 acked=9798 failed=0
+deliveries: expected=195960 live=195960 late=0 lost=0 (0.0000%) unacked-delivered=0
+integrity: redelivered=0 double-insert=0 reordered=0
+sync: calls=195960 errors=0 reconnects=0
+reconnect     n=0
+initial sync  n=2000    p50=729.69ms   p95=854.3ms    p99=887.63ms   max=919.29ms

@@ -2,7 +2,7 @@
 
 How to run: [`bench/README.md`](../bench/README.md). Raw outputs: `bench/results/<phase>/`.
 
-**Environment (all runs):** AMD Ryzen AI 5 330 (8 threads), 14 GB RAM, Linux. Postgres 16.15 and Redis 7
+**Environment (all runs):** AMD Ryzen AI 5 330 (8 threads), 14 GB RAM, Linux. Postgres 16.15 (18 in phase 04) and Redis 7
 in rootless podman (vfs storage driver, so expect slower Postgres I/O than bare metal). Go benchmarks
 show the median of 6 runs. Load-test client and server share the machine.
 
@@ -232,3 +232,175 @@ What the numbers do not show:
     open item in `docs/operations.md`.
 - **SQL fan-out is latency-neutral.** In interleaved A/B runs it measured 5.9ms vs 5.8ms send
   p50. It saves a round trip and the member-list transfer, and fixes a membership race.
+
+## 04 — horizontal (`bench/results/04-horizontal`)
+
+Branch `bench/horizontal`. This phase checks whether Nimlet scales out, and how it behaves when
+instances join, leave or fail. Harness: `bench/cluster.sh` and `bench/horizontal.sh`
+([`bench/README.md`](../bench/README.md#4-cluster-horizontal-scaling-elasticity-failures)).
+
+**Environment.** Same laptop. Everything is pinned to its own cores:
+
+| Component | Cores |
+|---|---|
+| Postgres 18 (`max_locks_per_transaction=256`, data dir in `/dev/shm`) | 0-2 |
+| HAProxy (consistent hash on `Authorization`, so a user's requests stick to one instance) | 3 |
+| loadgen | 4, 7 |
+| Redis 7 | 7 |
+| Nimlet instances (host networking, CFS quota with a 10ms period) | 5-6 |
+
+All instances share the same two cores, so adding instances never adds CPU. What these runs show
+is the cost of splitting the same CPU across more processes, and where the shared Postgres stops
+the curve. They can't show absolute scale-out on more hardware.
+
+**Workloads.**
+- *sync-heavy*: 2000 users in 100 rooms of 20, all long-polling, 100 senders. Every send wakes
+  20 `/sync` calls, so most of the cost lands on the instances.
+- *send-heavy*: 200 senders in 20 rooms, one listener per room. Most of the cost lands on
+  Postgres' serialised position allocation.
+
+A step lasts 20s after a 10s warm-up. It passes when it reaches ≥98% of its rate, has no failed
+send, delivers everything, and keeps delivery p99 under 500ms. *Capacity* is the highest passing
+step. Every run starts from an empty database. Three repetitions give the median (min–max).
+
+### Code changes in this phase
+
+Measured on sync-heavy with one unlimited instance. The phase-03 code passed **200 msg/s**; this
+branch passes **2500 msg/s** (50k deliveries/s).
+
+| Commit | Change |
+|---|---|
+| `perf(events)` | Sends are group-committed: concurrent sends share one transaction for position allocation and one for the insert, instead of one WAL fsync each. Concurrent `/sync` reads run as one `unnest` + `LATERAL` statement. Inserts into `event_visibility` dropped `ON CONFLICT DO NOTHING`, which cost 4× on the partitioned table. |
+| `perf(auth)` | Session lookups are cached for 1s (`NIMLET_AUTH_CACHE_TTL_MS`). A revoked token stops working on the other instances within a second. |
+| `feat(config)` | `NIMLET_PROFILE=small\|medium\|large` sizes batch waits, workers and pool per instance size (see [Sizing](../README.md#sizing)). |
+| `fix(sync)` | Waiting long-polls are released on shutdown (see elasticity below). |
+
+Two correctness bugs surfaced on the way and were fixed before these runs:
+- **Wake-ups lost behind the read ceiling.** When an event was still hidden by another batch's
+  in-flight position, the woken reader found nothing and slept its full 30s timeout. It now waits
+  for the ceiling to pass.
+- **Grouped reads failing silently.** A table alias collision made the grouped read fail and fall
+  back to one query per reader, which throttled `/sync`.
+
+### Profiles on the same two cores
+
+| Profile | Instances × CPU | Capacity msg/s | send p50 / p99 ms | delivery p50 / p99 ms | lost / dup / reordered |
+|---|---|---:|---:|---:|---:|
+| `small` | 8 × 0.25 | 1600 | 128 / 334 | 210 / 478 | 0 / 0 / 0 |
+| `medium` | 2 × 1 | 2500 (2500–3000) | 62 / 210 | 137 / 335 | 0 / 0 / 0 |
+| `large` | 1 × 2 (no quota) | 2500 | 183 / 312 | 253 / 417 | 0 / 0 / 0 |
+
+Latency is at each run's capacity step. Splitting two cores into eight quarter-CPU instances
+keeps 64% of the single instance's throughput; splitting into two halves loses nothing.
+
+### Scalability: 1, 2, 4, 8 instances of 0.25 CPU
+
+| N | sync-heavy capacity | × N=1 | send-heavy capacity | × N=1 | Postgres busy at capacity (sync / send) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 150 | 1.0 | 1600 (1600–2000) | 1.0 | 20% / 29% |
+| 2 | 300 | 2.0 | 3000 (2500–3000) | 1.9 | 36% / 51% |
+| 4 | 1300 (1000–1300) | 8.7 | 4000 (4000–5000) | 2.5 | 69% / 87% |
+| 8 | 1600 | 10.7 | 5000 | 3.1 | 96% / 99% |
+
+At a fixed 150 msg/s, sync-heavy delivery p99 fell from 242ms (N=1) to 53ms (N=8). At a fixed
+1600 msg/s, send-heavy delivery p99 fell from 131ms to 56ms. Loss, duplication and reordering
+were 0 in all 24 runs (25M deliveries).
+
+- **sync-heavy scales with instances until Postgres saturates.** It grows faster than linearly
+  up to N=4: one quarter-CPU instance spends most of its quota on long-poll bookkeeping, and
+  each added instance brings more group-commit and grouped-read batching. At N=8 Postgres is at
+  96% of its three cores, and that is the ceiling.
+- **send-heavy is bound by Postgres from the start.** Instances mostly forward sends to Postgres.
+  Throughput follows Postgres CPU and stops at about 5000 msg/s when it reaches 99%.
+- Past that point the next step is a larger Postgres, not more instances.
+
+### Elasticity: 2 → 3 → 4 → 3 → 2 instances at 180 msg/s
+
+Instances join and leave once a minute under constant sync-heavy load. *drain* takes an instance
+out of HAProxy before SIGTERM; *no drain* just sends SIGTERM.
+
+| Event | drain: delivery p99 max | no drain: delivery p99 max | no drain, before `fix(sync)` |
+|---|---:|---:|---:|
+| start 3 | 130ms | 158ms | 147ms |
+| start 4 | 124ms | 85ms | 79ms |
+| stop 4 | 77ms | 202ms | **29,474ms** |
+| stop 3 | 142ms | 343ms | **29,475ms** |
+
+Both modes completed with no failed send, no sync error, and nothing lost, duplicated or
+reordered. A new instance receives its fair share of requests within 1–2s.
+
+Before the fix, SIGTERM stopped the instance's Redis subscriptions, but its open long-polls kept
+waiting for a wake-up that could no longer arrive. The graceful shutdown then held those clients
+(about a quarter of the users) for the whole 30s long-poll timeout. Now the long-polls answer at
+once and the clients re-poll another instance. Raw run: `elastic-before-fix/`.
+
+### Redistribution and reconnection
+
+Nimlet has no rendezvous or discovery: instances are stateless and every instance subscribes to
+all Redis partitions. At 20 msg/s, an instance was added and removed (drained) five times, with
+long-poll timeouts of 30s and of 5s. If a long-poll could land on a new instance before its
+subscriptions were up, the run would show deliveries as slow as the timeout.
+
+| Long-poll timeout | Delivery max in the 30s after each start (5 cycles) | LB fair share after | sync errors |
+|---|---|---:|---:|
+| 30s | 63–80ms | 1–3s | 0 |
+| 5s | 51–112ms | 1–2s | 0 |
+
+No missed wake-up showed up. HAProxy's 1s health check only sends traffic once the instance
+listens. The subscriptions start just before the listener opens, but nothing waits for Redis to
+confirm them, so a narrow race remains possible in principle; these runs never hit it.
+
+### Failures at 400 msg/s on 4 instances
+
+| Fault | Failed sends | Send retries | Sync errors | Reconnect max | Delivery max | Lost / late / dup (client, Postgres) / reordered |
+|---|---:|---:|---:|---:|---:|---|
+| `kill -9` one instance | 0 | 2 | 27 | 388ms | 537ms | 0 / 0 / 0, 0 / 0 |
+| Redis paused 10s | 0 | 0 | 0 | – | 10.9s | 0 / 0 / 0, 0 / 0 |
+| Redis restarted | 0 | 0 | 0 | – | 433ms | 0 / 0 / 0, 0 / 0 |
+| Postgres restarted | 0 | 142 | 187 | 443ms | 678ms | 0 / 0 / 0, 0 / 0 |
+| Instance booted while Redis is down | 0 | 0 | 0 | – | 11.0s | 0 / 0 / 0, 0 / 0 |
+
+- **Instance killed.** HAProxy re-routes its users and the retried sends reuse their txnId. No
+  duplicates in Postgres either (`verify.sql`).
+- **Redis paused.** Wake-ups stall for the pause, and deliveries arrive once Redis is back.
+  Redis is only a latency path: nothing was lost.
+- **Redis restarted.** Subscriptions reconnect on their own.
+- **Postgres restarted.** Sends fail during the restart, and the client retries them with the
+  same txnId. 0 failed after retries, 0 duplicates.
+- **Instance booted while Redis is down.** The instance refuses to start (`redis: ping: i/o
+  timeout`) instead of running without subscriptions, so an orchestrator just restarts it. The
+  11s delivery max comes from the Redis pause the test needs, not from the new instance.
+
+### Disk fsync on this laptop (`fsync/`)
+
+The first full run used Postgres on the laptop's NVMe. Results swung from 0 to 1000 msg/s
+between repetitions of the same configuration. Every run had one or two seconds where all cores
+went idle at once and every commit waited about 1s. Postgres logged no statement over 250ms.
+Same run (one `large` instance, 600 msg/s for 90s), three storage setups:
+
+| Postgres storage | send p99 / max | delivery p99 / max |
+|---|---:|---:|
+| data dir on disk | 311 / 924ms | 370 / 1044ms |
+| disk, `synchronous_commit=off` | 55 / 128ms | 158 / 267ms |
+| data dir in `/dev/shm` (fsync still on) | 47 / 95ms | 109 / 229ms |
+
+The stalls are fsync tail latency on this disk (ext4, 89% full), not Nimlet. The phase-04 runs
+use `/dev/shm` so they measure CPU and coordination. In production, Postgres' fsync latency goes
+straight into send and delivery p99: use storage with consistent sync latency.
+
+### Recommended configurations
+
+| System size | Layout | Profile | Notes |
+|---|---|---|---|
+| Small (≤ ~1k concurrent users, a few hundred msg/s) | 1–2 instances of 0.5–1 CPU, Postgres 2 cores | `small` (≤0.5 CPU) or `medium` | A second instance is for availability; one 1-CPU `medium` instance handles this load. |
+| Medium (~10k users, ~1–2k msg/s) | 2–4 instances of 1–2 CPUs, Postgres 4 cores | `medium` | The tested 2 × 1 CPU split reached 2500 msg/s on a 3-core Postgres. |
+| Large (tens of thousands of users, several k msg/s) | 4+ instances of 2+ CPUs, Postgres 8+ cores on fast storage | `large` | Postgres CPU and fsync latency are the ceiling. Size Postgres first and add instances while its CPU has room. |
+
+For all sizes:
+- Postgres 18 with `max_locks_per_transaction=256`.
+- `NIMLET_DB_MAX_CONNS` = Postgres `max_connections` / instances (profiles default to 12–16 for
+  small and medium).
+- Load-balance on a hash of the `Authorization` header, so each instance's 1s session cache
+  stays warm.
+- Drain an instance in the LB before stopping it. It is no longer required for correctness or
+  latency, but it avoids a burst of re-routed requests.

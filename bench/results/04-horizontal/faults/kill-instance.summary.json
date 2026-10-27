@@ -1,0 +1,48 @@
+{
+  "capacity": 400,
+  "errors": {
+    "sync 502": 27
+  },
+  "listeners": 2000,
+  "members": 2000,
+  "reconnect_max_ms": 387.714,
+  "reconnect_p99_ms": 387.714,
+  "reconnects": 27,
+  "reliability": {
+    "attempted": 51998,
+    "acked": 51998,
+    "failed": 0,
+    "expected": 1039960,
+    "delivered_live": 1039960,
+    "delivered_late": 0,
+    "lost": 0,
+    "unacked_delivered": 0,
+    "redelivered": 0,
+    "double_insert": 0,
+    "reorders": 0
+  },
+  "rooms": 100,
+  "run": "dmfrxhgio7ob",
+  "senders": 100,
+  "slo_ms": 60000,
+  "step_duration_s": 120,
+  "steps": [
+    {
+      "rate": 400,
+      "achieved": 399.9916666666667,
+      "acked": 47999,
+      "failed": 0,
+      "retries": 2,
+      "shed": 0,
+      "delivered": 959980,
+      "expected": 959980,
+      "send_p50_ms": 14.1,
+      "send_p99_ms": 124.793,
+      "delivery_p50_ms": 48.651,
+      "delivery_p99_ms": 195.215,
+      "pass": true
+    }
+  ],
+  "sync_calls": 1040333,
+  "sync_errors": 27
+}

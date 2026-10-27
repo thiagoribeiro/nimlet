@@ -1028,6 +1028,19 @@ media-heavy deployment:
 
 PostgreSQL is always the source of truth. Redis improves latency, not correctness.
 
+**Measured** ([`docs/benchmarks.md`](docs/benchmarks.md), phase 04; one laptop, Postgres on 3 cores, instances on 2):
+
+- **Single instance:** one instance on 2 cores sustains 2500 msg/s into rooms of 20, which is
+  50k deliveries/s at delivery p99 under 500ms.
+- **Scaling out on the same 2 cores:** splitting them into 1 → 8 instances of 0.25 CPU raises
+  capacity 10.7× for sync-heavy load (150 → 1600 msg/s) and 3.1× for send-heavy load
+  (1600 → 5000 msg/s). The ceiling is then the shared Postgres (96–99% CPU).
+- **Changes and failures:** adding and removing instances, `kill -9` of an instance, and
+  restarting Redis or Postgres under load lost, duplicated or reordered nothing, across 78M
+  checked deliveries. Sends are retried with the same txnId.
+- **Sizing:** recommended configurations per system size are in
+  [`docs/benchmarks.md`](docs/benchmarks.md#recommended-configurations) and [Sizing](#sizing).
+
 For horizontal scaling, each instance subscribes to all `NIMLET_SYNC_PARTITIONS` channels. Notifications received by instances without matching local waiters are silently discarded — this is correct Pub/Sub fan-out behavior. Future work: Redis Streams with consumer groups to avoid duplicate processing.
 
 ---

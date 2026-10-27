@@ -1,0 +1,6 @@
+1793120940 drain start 3
+1793121000 drain start 4
+1793121061 drain drain 4
+1793121062 drain stop 4
+1793121122 drain drain 3
+1793121123 drain stop 3

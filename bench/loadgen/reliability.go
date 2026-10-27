@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -56,7 +57,8 @@ func (r *runState) noteError(err error) { r.noteErrorAs("send", err) }
 
 func (r *runState) noteErrorAs(op string, err error) {
 	class := err.Error()
-	if he, ok := err.(*httpError); ok {
+	var he *httpError
+	if errors.As(err, &he) {
 		class = fmt.Sprint(he.status)
 	} else {
 		for _, s := range []string{"connection refused", "connection reset", "EOF", "timeout", "broken pipe"} {

@@ -162,17 +162,25 @@ func LoadDB() (*DBConfig, error) {
 		return nil, fmt.Errorf("config: NIMLET_DB_DSN is required")
 	}
 	var errs []error
+	p, err := profileFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	maxConns := p.dbMaxConns
+	if maxConns == 0 {
+		maxConns = defaultDBMaxConns()
+	}
 	db := &DBConfig{
 		DSN:         dsn,
-		MaxConns:    int32(envInt(&errs, "NIMLET_DB_MAX_CONNS", defaultDBMaxConns())),
+		MaxConns:    int32(envInt(&errs, "NIMLET_DB_MAX_CONNS", maxConns)),
 		AutoMigrate: envOr("NIMLET_AUTO_MIGRATE", "true") != "false",
 
 		EventBatchMax:     envInt(&errs, "NIMLET_EVENT_BATCH_MAX", 64),
-		EventBatchWaitUs:  envInt(&errs, "NIMLET_EVENT_BATCH_WAIT_US", 0),
-		EventBatchWorkers: envInt(&errs, "NIMLET_EVENT_BATCH_WORKERS", 4),
+		EventBatchWaitUs:  envInt(&errs, "NIMLET_EVENT_BATCH_WAIT_US", p.batchWaitUs),
+		EventBatchWorkers: envInt(&errs, "NIMLET_EVENT_BATCH_WORKERS", p.batchWorkers),
 		SyncReadMax:       envInt(&errs, "NIMLET_SYNC_READ_MAX", 64),
-		SyncReadWaitUs:    envInt(&errs, "NIMLET_SYNC_READ_WAIT_US", 0),
-		SyncReadWorkers:   envInt(&errs, "NIMLET_SYNC_READ_WORKERS", 8),
+		SyncReadWaitUs:    envInt(&errs, "NIMLET_SYNC_READ_WAIT_US", p.readWaitUs),
+		SyncReadWorkers:   envInt(&errs, "NIMLET_SYNC_READ_WORKERS", p.readWorkers),
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
@@ -189,6 +197,36 @@ func LoadAdminDSN() (string, error) {
 		return "", fmt.Errorf("config: NIMLET_ADMIN_DB_DSN is required for admin commands")
 	}
 	return dsn, nil
+}
+
+// profile holds the defaults NIMLET_PROFILE selects; any explicit variable still wins.
+// The values come from docs/benchmarks.md (phase 04). Per instance, grouping only pays off
+// when requests queue up: a small instance sees little concurrent load, so it waits a little
+// to fill groups and keeps few workers and connections (Postgres serialises allocations
+// anyway, and every connection costs it planning and memory); a large one fills groups by
+// itself and needs the parallelism.
+type profile struct {
+	batchWorkers, batchWaitUs int
+	readWorkers, readWaitUs   int
+	dbMaxConns                int // 0: defaultDBMaxConns()
+}
+
+var profiles = map[string]profile{
+	// Up to ~0.5 CPU per instance, many instances.
+	"small": {batchWorkers: 1, batchWaitUs: 2000, readWorkers: 1, readWaitUs: 2000, dbMaxConns: 12},
+	// About 1-2 CPUs per instance.
+	"medium": {batchWorkers: 1, batchWaitUs: 1000, readWorkers: 1, readWaitUs: 1000, dbMaxConns: 16},
+	// 2+ CPUs per instance, few instances.
+	"large": {batchWorkers: 4, batchWaitUs: 0, readWorkers: 8, readWaitUs: 0},
+}
+
+func profileFromEnv() (profile, error) {
+	name := envOr("NIMLET_PROFILE", "large")
+	p, ok := profiles[name]
+	if !ok {
+		return profile{}, fmt.Errorf("config: NIMLET_PROFILE=%q: want small, medium or large", name)
+	}
+	return p, nil
 }
 
 func defaultDBMaxConns() int {

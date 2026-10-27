@@ -905,6 +905,7 @@ All configuration is via environment variables.
 | `NIMLET_EVENT_BATCH_MAX` | `64` | Sends written per transaction (group commit); `1` disables batching |
 | `NIMLET_EVENT_BATCH_WORKERS` | profile (1 / 1 / 4) | Send batches in flight per instance |
 | `NIMLET_EVENT_BATCH_WAIT_US` | profile (2000 / 1000 / 0) | µs a send batch waits for more sends after its first |
+| `NIMLET_EVENT_BATCH_MODE` | `split` | `split`: positions are allocated in a short transaction and the batch is inserted in a second one. `single`: one transaction holds the allocation lock until its commit (phase 05 in `docs/benchmarks.md`) |
 | `NIMLET_SYNC_READ_MAX` | `64` | Concurrent `/sync` queries run as one statement; `1` disables grouping |
 | `NIMLET_SYNC_READ_WORKERS` | profile (1 / 1 / 8) | `/sync` query groups in flight per instance |
 | `NIMLET_SYNC_READ_WAIT_US` | profile (2000 / 1000 / 0) | µs a query group waits for more queries after its first |

@@ -53,9 +53,13 @@ type DBConfig struct {
 	EventBatchMax     int // events per write transaction (default 64)
 	EventBatchWaitUs  int // µs a write batch waits for more events after its first (default 0)
 	EventBatchWorkers int // write batches in flight (default 4)
-	SyncReadMax       int // /sync queries per statement (default 64)
-	SyncReadWaitUs    int // µs a read group waits for more queries after its first (default 0)
-	SyncReadWorkers   int // read groups in flight (default 8)
+	// EventBatchSingleTx writes a batch in one transaction that holds the allocation lock
+	// until its commit (NIMLET_EVENT_BATCH_MODE=single), instead of allocating in a short
+	// transaction and inserting in a second one (split, the default).
+	EventBatchSingleTx bool
+	SyncReadMax        int // /sync queries per statement (default 64)
+	SyncReadWaitUs     int // µs a read group waits for more queries after its first (default 0)
+	SyncReadWorkers    int // read groups in flight (default 8)
 }
 
 type RedisConfig struct {
@@ -181,6 +185,13 @@ func LoadDB() (*DBConfig, error) {
 		SyncReadMax:       envInt(&errs, "NIMLET_SYNC_READ_MAX", 64),
 		SyncReadWaitUs:    envInt(&errs, "NIMLET_SYNC_READ_WAIT_US", p.readWaitUs),
 		SyncReadWorkers:   envInt(&errs, "NIMLET_SYNC_READ_WORKERS", p.readWorkers),
+	}
+	switch mode := envOr("NIMLET_EVENT_BATCH_MODE", "split"); mode {
+	case "split":
+	case "single":
+		db.EventBatchSingleTx = true
+	default:
+		errs = append(errs, fmt.Errorf("config: NIMLET_EVENT_BATCH_MODE=%q: want split or single", mode))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err

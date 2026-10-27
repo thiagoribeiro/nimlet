@@ -46,3 +46,25 @@ func TestLoadDB_Profiles(t *testing.T) {
 		t.Fatal("unknown profile accepted")
 	}
 }
+
+func TestLoadDB_EventBatchMode(t *testing.T) {
+	t.Setenv("NIMLET_DB_DSN", "postgres://x")
+
+	db, err := LoadDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db.EventBatchSingleTx {
+		t.Fatal("default must be split")
+	}
+
+	t.Setenv("NIMLET_EVENT_BATCH_MODE", "single")
+	if db, err = LoadDB(); err != nil || !db.EventBatchSingleTx {
+		t.Fatalf("single not applied: %+v, %v", db, err)
+	}
+
+	t.Setenv("NIMLET_EVENT_BATCH_MODE", "both")
+	if _, err := LoadDB(); err == nil {
+		t.Fatal("expected an error for an unknown mode")
+	}
+}

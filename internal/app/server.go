@@ -234,6 +234,10 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 		AuthPerIPPerMinute: cfg.HTTP.AuthPerIPPerMinute,
 	})
 
+	// Release waiting long-polls once the listeners are closed: the dispatcher stops with
+	// ctx, so they would otherwise sit out their full timeout before the client moves on.
+	srv.RegisterOnShutdown(registry.Close)
+
 	// Start server in background.
 	errCh := make(chan error, 1)
 	go func() {
@@ -249,8 +253,8 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 		return fmt.Errorf("server: %w", err)
 	}
 
-	// Graceful shutdown: 30s for in-flight requests (including long-poll /sync).
-	// /sync goroutines unblock immediately via ctx.Done().
+	// Graceful shutdown: 30s for in-flight requests. Waiting /sync long-polls return at
+	// once (registry.Close above).
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

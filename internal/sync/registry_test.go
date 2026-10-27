@@ -85,3 +85,19 @@ func TestWaiterRegistry_NotificationNotLostWhenBuffered(t *testing.T) {
 		t.Fatal("notification was lost")
 	}
 }
+
+func TestWaiterRegistry_CloseIsIdempotent(t *testing.T) {
+	r := nimsync.NewWaiterRegistry()
+	select {
+	case <-r.Closed():
+		t.Fatal("closed before Close")
+	default:
+	}
+	r.Close()
+	r.Close()
+	select {
+	case <-r.Closed():
+	default:
+		t.Fatal("expected Closed to be closed")
+	}
+}

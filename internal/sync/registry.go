@@ -20,10 +20,13 @@ type waiterSet map[chan struct{}]struct{}
 // failed fast-path query and the goroutine blocking on select.
 type WaiterRegistry struct {
 	shards [256]waiterShard
+
+	closeOnce sync.Once
+	closed    chan struct{}
 }
 
 func NewWaiterRegistry() *WaiterRegistry {
-	r := &WaiterRegistry{}
+	r := &WaiterRegistry{closed: make(chan struct{})}
 	for i := range r.shards {
 		r.shards[i].users = make(map[string]waiterSet)
 		r.shards[i].rooms = make(map[string]waiterSet)
@@ -94,6 +97,18 @@ func (r *WaiterRegistry) NotifyRoom(roomID string) {
 	s.mu.Lock()
 	sendAll(s.rooms[roomID])
 	s.mu.Unlock()
+}
+
+// Close releases every current and future waiter (see Closed). Called on shutdown: once the
+// dispatcher stops, no wake-up reaches this instance, and a long-poll left waiting would
+// hold its client for the whole timeout instead of letting it re-poll another instance.
+func (r *WaiterRegistry) Close() {
+	r.closeOnce.Do(func() { close(r.closed) })
+}
+
+// Closed is closed by Close.
+func (r *WaiterRegistry) Closed() <-chan struct{} {
+	return r.closed
 }
 
 // WaiterCount returns the number of active user waiters (for observability).

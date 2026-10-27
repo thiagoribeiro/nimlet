@@ -151,6 +151,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.http.Shutdown(ctx)
 }
 
+// RegisterOnShutdown runs f once Shutdown has closed the listeners, while in-flight
+// requests are still draining.
+func (s *Server) RegisterOnShutdown(f func()) {
+	s.http.RegisterOnShutdown(f)
+}
+
 // Handler returns the underlying http.Handler, used in tests with httptest.NewServer.
 func (s *Server) Handler() http.Handler {
 	return s.http.Handler

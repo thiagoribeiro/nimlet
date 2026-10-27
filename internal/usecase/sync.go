@@ -93,16 +93,19 @@ func (s *syncService) Sync(ctx context.Context, cmd in.SyncCmd) (*in.SyncResult,
 
 	select {
 	case <-notifCh:
-		// Re-query after wake-up: the notification only guarantees that
-		// something changed, not what. False positives (shared partition) are fine.
-		events, err = s.events.GetVisible(ctx, cmd.UserID, cmd.Since, syncQueryLimit)
-		if err != nil {
-			return nil, fmt.Errorf("sync: re-query after notify: %w", err)
-		}
-
+	case <-s.registry.Closed():
+		// Shutting down: no more wake-ups will come. Answer now (re-querying, in case
+		// something landed since the first query) so the client re-polls another instance.
 	case <-wait.Done():
 		// Timeout or client disconnect — return empty result with current cursor.
 		// Client opens another /sync immediately; this is the normal keep-alive cycle.
+		return result(cmd.Since, events), nil
+	}
+	// Re-query after wake-up: the notification only guarantees that
+	// something changed, not what. False positives (shared partition) are fine.
+	events, err = s.events.GetVisible(ctx, cmd.UserID, cmd.Since, syncQueryLimit)
+	if err != nil {
+		return nil, fmt.Errorf("sync: re-query after notify: %w", err)
 	}
 	return result(cmd.Since, events), nil
 }

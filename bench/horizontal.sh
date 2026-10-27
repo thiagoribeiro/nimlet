@@ -22,7 +22,7 @@ RT=$(command -v docker || command -v podman)
 # server binds it.
 export PG_PORT=${PG_PORT:-15432} REDIS_PORT=${REDIS_PORT:-16379}
 export PG_CPUS=${PG_CPUS:-0-2} REDIS_CPUS=${REDIS_CPUS:-7} LB_CPUS=${LB_CPUS:-3} INST_CPUS=${INST_CPUS:-5-6}
-export HOSTNET=1 NO_S3=1 PG_LOCKS=${PG_LOCKS:-256}
+export HOSTNET=1 NO_S3=1 PG_LOCKS=${PG_LOCKS:-256} PG_RAM=${PG_RAM-1}
 export NIMLET_BENCH_PG_IMAGE=${NIMLET_BENCH_PG_IMAGE:-docker.io/library/postgres:18-alpine}
 # One unlimited instance saturates Postgres' three cores, so the cluster experiments give each
 # instance a quota (0.25 CPU, the "small" profile) that makes N matter: 8 of them fill the two
@@ -33,7 +33,7 @@ LG_CPUS=${LG_CPUS:-4,7}
 REPS=${REPS:-3}
 STEP_DURATION=${STEP_DURATION:-20s}
 SYNC_STEPS=${SYNC_STEPS:-100,150,200,300,400,500,600,800,1000,1300,1600,2000}
-SEND_STEPS=${SEND_STEPS:-200,400,600,800,1000,1300,1600,2000,2500,3000,4000}
+SEND_STEPS=${SEND_STEPS:-200,400,600,800,1000,1300,1600,2000,2500,3000,4000,5000,6000}
 REF_STEPS=${REF_STEPS:-600,800,1000,1300,1600,2000,2500,3000}
 # ~60% of the capacity the pilot runs measured for 2 (elastic) and 4 (faults) small instances.
 ELASTIC_RATE=${ELASTIC_RATE:-180}
@@ -57,7 +57,11 @@ bench/cluster.sh build
 	top -bn1 -o %CPU | head -20
 } > "$OUT/host-$(date +%s).txt"
 
-mark() { echo "$(date +%s) $*" >> "$1/events.txt"; }
+mark() {
+	mdir=$1
+	shift
+	echo "$(date +%s) $*" >> "$mdir/events.txt"
+}
 
 # fresh DIR WORKLOAD: empty database, setup on the unlimited off-LB instance. The state file
 # holds access tokens, so it stays in bin/ (gitignored), not with the results.

@@ -12,7 +12,17 @@ S3=nimlet-bench-s3
 PG_PORT=${PG_PORT:-55432}
 REDIS_PORT=${REDIS_PORT:-56379}
 
-down() { "$RT" rm -f "$PG" "$RD" "$S3" >/dev/null 2>&1 || true; }
+# PG_RAM=1 keeps the data directory in /dev/shm: fsync still runs but at memory speed. On a
+# laptop disk, fsync tails of ~1s stall every commit at once and drown out what the cluster
+# benchmarks measure (docs, phase 04). A bind mount, unlike --tmpfs, survives a container restart.
+PG_RAM_DIR=/dev/shm/nimlet-bench-pg
+
+down() {
+	"$RT" rm -f "$PG" "$RD" "$S3" >/dev/null 2>&1 || true
+	if [ -d "$PG_RAM_DIR" ]; then
+		if [ "$(basename "$RT")" = podman ]; then podman unshare rm -rf "$PG_RAM_DIR"; else rm -rf "$PG_RAM_DIR"; fi
+	fi
+}
 
 case "${1:-}" in
 up)
@@ -41,8 +51,13 @@ up)
 		pgport="$pgport -c shared_buffers=2GB -c effective_cache_size=4GB -c max_wal_size=8GB \
 			-c checkpoint_timeout=15min -c wal_buffers=64MB -c jit=off -c random_page_cost=1.1"
 	fi
+	pgvol=""
+	if [ -n "${PG_RAM:-}" ]; then
+		mkdir -p "$PG_RAM_DIR"
+		pgvol="-v $PG_RAM_DIR:/var/lib/postgresql:U"
+	fi
 	# shellcheck disable=SC2086
-	"$RT" run -d --rm --name "$PG" $pgnet -e POSTGRES_USER=nimlet -e POSTGRES_PASSWORD=nimlet \
+	"$RT" run -d --rm --name "$PG" $pgnet $pgvol -e POSTGRES_USER=nimlet -e POSTGRES_PASSWORD=nimlet \
 		-e POSTGRES_DB=nimlet_bench "${NIMLET_BENCH_PG_IMAGE:-docker.io/library/postgres:16-alpine}" \
 		-c max_connections=300 $pgport >/dev/null
 	# shellcheck disable=SC2086

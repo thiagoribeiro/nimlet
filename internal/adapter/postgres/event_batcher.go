@@ -273,7 +273,7 @@ func insertBatchSQL(batch []createReq, positions, seqs []int64, clearInflight bo
 	if clearInflight {
 		inflight = `, done AS (
 			DELETE FROM stream_inflight
-			WHERE pos = ANY($2) AND allocated_at > clock_timestamp() - interval '` + inflightWriteDeadline + `'
+			WHERE pos = ANY($2) AND allocated_at > ` + inflightLiveSince(inflightWriteDeadline) + `
 			RETURNING pos
 		), checked AS (
 			SELECT nimlet_assert((SELECT count(*) FROM done) = cardinality($2::bigint[]),

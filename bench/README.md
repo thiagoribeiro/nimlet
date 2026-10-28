@@ -76,6 +76,10 @@ into `bench/results/<name>/`. A full run takes about three hours.
 `horizontal.sh` (`VARIANTS='A B'` picks some), and `bench/pgprofile.sh <dir>` reports Postgres
 milliseconds per send from `pg_stat_statements`.
 
+Memory: run `bench/memsample.sh mem.csv &` next to any of them and kill it afterwards.
+`python3 bench/memreport.py mem.csv bench/results/<name>` turns a `sizes` run into the
+phase-07 tables.
+
 `horizontal.sh` sets `PG_RAM=1`, which keeps the Postgres data directory in `/dev/shm`. Commits
 still fsync, but at memory speed. On the laptop disk used for phase 04, fsync tails of about 1s
 stalled every commit at once and failed steps at random (`bench/results/04-horizontal/fsync`).

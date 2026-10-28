@@ -575,3 +575,50 @@ Same protocol as phases 04 and 05: Postgres in `/dev/shm`, three repetitions, me
 - Sync-heavy scaling is 10.7× from 1 to 8 instances again (before: 10×, from a lower base).
 - Phase 05's bigger send batches now add to phase 04's numbers: `medium` reaches 3000 msg/s.
 - 0 lost, duplicated or reordered in every run.
+
+## 07 — memory (`bench/results/07-memory`)
+
+Memory under the phase-04 `sizes` protocol: sync-heavy, 2000 listeners in 100 rooms of 20.
+The code is phase 06 (`main` after #6). It is one repetition per profile, with Postgres in
+`/dev/shm`. Every 2s, `bench/memsample.sh` sampled:
+- each container's cgroup;
+- each instance's Go runtime (`/metrics`);
+- the loadgen's RSS.
+
+`bench/memreport.py` builds the tables. Values are means over the seconds at the capacity step,
+with the run's peak alongside. 0 lost or reordered in every run.
+
+### Nimlet, per instance
+
+| Profile (capacity) | Connections per instance | cgroup | anon | Go heap in use | goroutines | peak cgroup |
+|---|---:|---:|---:|---:|---:|---:|
+| `small` 8 × 0.25 (1300 msg/s) | ~260 | 77–96 MB | 68–86 MB | 54–59 MB | ~1500 | 115 MB |
+| `medium` 2 × 1 (3000 msg/s) | ~1050 | ~200 MB | 149–161 MB | 85–97 MB | 3100–3900 | 205 MB |
+| `large` 1 × 2 (2500 msg/s) | ~2100 | 293 MB | 242 MB | 157 MB | ~6200 | 411 MB |
+
+- **Memory follows open long-polls, not the message rate.** The three points fit
+  **~55 MB + ~90 KB per connection** of process memory (anon). Extrapolating, which these runs
+  didn't measure: ~1 GB for 10k long-polls on one instance.
+- **Cluster totals:** 8 `small` instances use ~630 MB, 2 `medium` ~400 MB and 1 `large`
+  ~290 MB. Each extra process adds its fixed share.
+- **The `large` peak (411 MB, 10k goroutines) is queueing,** not growth: it comes in the step
+  above capacity, where requests pile up. Runs of ~3 minutes can't rule out a slow leak; that
+  takes a long run at constant load.
+
+### Postgres and the rest
+
+| Component | At capacity | Note |
+|---|---:|---|
+| Postgres backends (anon) | 156 MB (32 conns) – 445 MB (96 conns) | ~4.6 MB per connection: `small`'s 8 × 12 connections cost more than `large`'s 50 |
+| Postgres data dir | +2.2 GB per 256k sends | ~8.6 KB per message in a room of 20: event, idempotency, 20 `event_visibility` rows, indexes and WAL. Over half is WAL, which checkpoints trim on a longer run. |
+| Redis | 22–55 MB | |
+| HAProxy | 64–104 MB | |
+| loadgen | 0.4–1 GB RSS | the test client |
+
+The Postgres cgroup reads ~2.4 GB, almost all of it the data dir that `PG_RAM` keeps in
+`/dev/shm`. That memory is charged to Postgres as shmem but is not Postgres' working memory.
+`shared_buffers` stayed at the image's 128 MB (`PG_TUNE` off).
+
+**Sizing.** For an instance's memory limit, budget ~55 MB plus ~90 KB per long-poll it serves,
+with roughly 1.5× headroom for load above capacity. For Postgres, budget ~5 MB per
+connection on top of `shared_buffers`.

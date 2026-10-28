@@ -18,3 +18,31 @@ func TestLoad_RejectsInvalidIntegers(t *testing.T) {
 		t.Fatalf("expected an error naming NIMLET_MEDIA_MAX_BYTES, got %v", err)
 	}
 }
+
+func TestLoadDB_Profiles(t *testing.T) {
+	t.Setenv("NIMLET_DB_DSN", "postgres://x")
+
+	t.Setenv("NIMLET_PROFILE", "small")
+	db, err := LoadDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db.EventBatchWorkers != 1 || db.SyncReadWorkers != 1 || db.SyncReadWaitUs != 2000 || db.MaxConns != 12 {
+		t.Fatalf("small profile not applied: %+v", db)
+	}
+
+	// An explicit variable overrides the profile.
+	t.Setenv("NIMLET_SYNC_READ_WORKERS", "3")
+	db, err = LoadDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db.SyncReadWorkers != 3 || db.EventBatchWorkers != 1 {
+		t.Fatalf("override lost: %+v", db)
+	}
+
+	t.Setenv("NIMLET_PROFILE", "huge")
+	if _, err := LoadDB(); err == nil {
+		t.Fatal("unknown profile accepted")
+	}
+}

@@ -47,3 +47,54 @@ timestamp embedded in the message. `delivered` below 100% means events were **sk
 client cursor, not slow — every scenario should report 100%.
 
 CPU profile while a scenario runs: `curl -o cpu.pprof 'localhost:56060/debug/pprof/profile?seconds=10'`.
+
+## 4. Cluster: horizontal scaling, elasticity, failures
+
+`bench/cluster.sh` runs N Nimlet instances (static binary in `alpine` containers, host
+networking) behind HAProxy on `127.0.0.1:18080`, on top of `bench/infra.sh`. HAProxy has eight
+pre-declared slots switched through its runtime API, so instances join and leave without a
+reload. Rootless podman doesn't delegate the `cpuset` controller, so `bench/pin.sh` pins
+containers with `taskset` instead.
+
+```bash
+export PG_PORT=15432 REDIS_PORT=16379   # every harness port stays out of 32768-60999 (see below)
+HOSTNET=1 NO_S3=1 PG_CPUS=0-2 REDIS_CPUS=7 bench/infra.sh up
+bench/cluster.sh build && bench/cluster.sh up 2      # instances on 5-6, HAProxy on 3
+go run ./bench/loadgen -addr http://127.0.0.1:18080 -members 2000 -rooms 100 -listeners 2000 \
+  -senders 100 -steps 200,400,800 -duration 20s -out /tmp/run
+bench/cluster.sh start 3 | remove 3 | kill 2 | lb "show stat" | down
+```
+
+Ports sit below the kernel's ephemeral range (32768-60999). With tens of thousands of client
+connections, an outgoing socket can take a port in that range before a restarted instance or
+database binds it, and the restart fails with "address already in use".
+
+`bench/horizontal.sh <name> [sizes scale elastic redistrib faults]` runs the phase-04 experiments
+into `bench/results/<name>/`. A full run takes about three hours.
+
+`horizontal.sh` sets `PG_RAM=1`, which keeps the Postgres data directory in `/dev/shm`. Commits
+still fsync, but at memory speed. On the laptop disk used for phase 04, fsync tails of about 1s
+stalled every commit at once and failed steps at random (`bench/results/04-horizontal/fsync`).
+Set `PG_RAM=` to measure with your own disk.
+
+The loadgen reports per step and for the whole run:
+
+- **Steps.** `-steps` runs several rates after a single setup. A step passes when it reached ≥98%
+  of its rate, had no failed sends, delivered everything and kept delivery p99 under `-slo`. The
+  highest passing step is the *capacity*.
+- **Reliability.** After the run, every listener drains its cursor and is reconciled against the
+  acked sends of its room:
+  - *lost*: acked, never delivered
+  - *late*: only found in that final drain
+  - *redelivered*: same event twice
+  - *double-insert*: one txnId stored twice
+  - *reordered*: `room_seq` going backwards
+
+  Failed sends are retried with the same txnId (`-send-retries`). `bench/verify.sql` checks the
+  stored events for duplicates directly in Postgres.
+- **Time series.** `-out` writes `<out>.ts.jsonl` (per second) and `<out>.summary.json`, so
+  failures and scaling events (`events.txt`, unix seconds) can be lined up with latency and
+  errors.
+- **Setup reuse.** `-setup-only -state f.json` runs the argon2 registrations once, against an
+  unlimited instance (`cluster.sh start 9`, off the LB). `-state f.json` reuses that setup in
+  later runs.

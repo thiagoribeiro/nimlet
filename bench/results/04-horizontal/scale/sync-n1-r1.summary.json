@@ -1,0 +1,79 @@
+{
+  "capacity": 150,
+  "errors": null,
+  "listeners": 2000,
+  "members": 2000,
+  "reconnect_max_ms": 0,
+  "reconnect_p99_ms": 0,
+  "reconnects": 0,
+  "reliability": {
+    "attempted": 9996,
+    "acked": 9996,
+    "failed": 0,
+    "expected": 199920,
+    "delivered_live": 199920,
+    "delivered_late": 0,
+    "lost": 0,
+    "unacked_delivered": 0,
+    "redelivered": 0,
+    "double_insert": 0,
+    "reorders": 0
+  },
+  "rooms": 100,
+  "run": "dmfp438iyxav",
+  "senders": 100,
+  "slo_ms": 500,
+  "step_duration_s": 20,
+  "steps": [
+    {
+      "rate": 100,
+      "achieved": 99.95,
+      "acked": 1999,
+      "failed": 0,
+      "retries": 0,
+      "shed": 0,
+      "delivered": 39980,
+      "expected": 39980,
+      "send_p50_ms": 3.612,
+      "send_p99_ms": 79.773,
+      "delivery_p50_ms": 17.84,
+      "delivery_p99_ms": 121.098,
+      "pass": true
+    },
+    {
+      "rate": 150,
+      "achieved": 149.95,
+      "acked": 2999,
+      "failed": 0,
+      "retries": 0,
+      "shed": 0,
+      "delivered": 59980,
+      "expected": 59980,
+      "send_p50_ms": 19.498,
+      "send_p99_ms": 131.386,
+      "delivery_p50_ms": 51.86,
+      "delivery_p99_ms": 233.753,
+      "pass": true
+    },
+    {
+      "rate": 200,
+      "achieved": 199.95,
+      "acked": 3999,
+      "failed": 0,
+      "retries": 0,
+      "shed": 0,
+      "delivered": 79980,
+      "expected": 79980,
+      "send_p50_ms": 76.781,
+      "send_p99_ms": 287.531,
+      "delivery_p50_ms": 318.411,
+      "delivery_p99_ms": 760.537,
+      "pass": false,
+      "fail_reasons": [
+        "delivery p99 761ms\u003eslo"
+      ]
+    }
+  ],
+  "sync_calls": 194616,
+  "sync_errors": 0
+}

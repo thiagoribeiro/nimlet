@@ -294,3 +294,42 @@ func TestSync_ReQueryOutlivesWaitDeadline(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, res.Events, 1)
 }
+
+// Shutdown: closing the registry releases a waiting long-poll at once, with whatever the
+// re-query finds, instead of holding the client until its timeout.
+func TestSync_RegistryCloseReleasesWaiter(t *testing.T) {
+	calls := 0
+	store := &testkit.MockEventStore{
+		GetVisibleFn: func(_ context.Context, _ string, _ int64, _ int) ([]*domain.Event, error) {
+			calls++
+			if calls == 1 {
+				return nil, nil
+			}
+			return []*domain.Event{makeEvent(3)}, nil
+		},
+	}
+
+	registry := nimsync.NewWaiterRegistry()
+	svc := usecase.NewSyncService(store, noLargeRooms(), registry, &testkit.MockPresenceStore{})
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		registry.Close()
+	}()
+
+	start := time.Now()
+	result, err := svc.Sync(context.Background(), in.SyncCmd{
+		UserID: "user1", Since: 0, TimeoutMs: 30_000,
+	})
+
+	require.NoError(t, err)
+	assert.Less(t, time.Since(start), 2*time.Second, "must not wait for the timeout")
+	require.Len(t, result.Events, 1)
+	assert.Equal(t, int64(3), result.NextBatch)
+
+	// Later long-polls on a closed registry don't wait either.
+	start = time.Now()
+	_, err = svc.Sync(context.Background(), in.SyncCmd{UserID: "user1", Since: 3, TimeoutMs: 30_000})
+	require.NoError(t, err)
+	assert.Less(t, time.Since(start), 2*time.Second)
+}

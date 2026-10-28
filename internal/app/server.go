@@ -18,6 +18,7 @@ import (
 	"github.com/thiagoribeiro/nimlet/internal/adapter/postgres"
 	"github.com/thiagoribeiro/nimlet/internal/adapter/redis"
 	s3adapter "github.com/thiagoribeiro/nimlet/internal/adapter/s3"
+	"github.com/thiagoribeiro/nimlet/internal/adapter/sessioncache"
 	"github.com/thiagoribeiro/nimlet/internal/appservice"
 	appcfg "github.com/thiagoribeiro/nimlet/internal/config"
 	"github.com/thiagoribeiro/nimlet/internal/cursor"
@@ -145,10 +146,21 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 	// --- Adapters ---
 	userStore := postgres.NewUserStore(pool)
 	deviceStore := postgres.NewDeviceStore(pool)
-	sessionStore := postgres.NewSessionStore(pool)
+	sessionStore := sessioncache.New(postgres.NewSessionStore(pool), time.Duration(cfg.Auth.CacheTTLMs)*time.Millisecond)
 	roomStore := postgres.NewRoomStore(pool)
 	membershipStore := postgres.NewMembershipStore(pool)
 	eventStore := postgres.NewEventStore(pool)
+	if cfg.DB.EventBatchMax > 1 || cfg.DB.SyncReadMax > 1 {
+		us := func(n int) time.Duration { return time.Duration(n) * time.Microsecond }
+		batched := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
+			Writes: postgres.GroupLimits{MaxItems: cfg.DB.EventBatchMax, MaxWait: us(cfg.DB.EventBatchWaitUs), Workers: cfg.DB.EventBatchWorkers},
+			Reads:  postgres.GroupLimits{MaxItems: cfg.DB.SyncReadMax, MaxWait: us(cfg.DB.SyncReadWaitUs), Workers: cfg.DB.SyncReadWorkers},
+		})
+		// Deferred, so it runs after the HTTP server's graceful shutdown below: in-flight
+		// sends are written before the workers stop.
+		defer batched.Close()
+		eventStore = batched
+	}
 	namespaceStore := postgres.NewNamespaceStore(pool)
 	mediaIndex := postgres.NewMediaIndex(pool)
 	txr := postgres.NewTransactor(pool)
@@ -222,6 +234,10 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 		AuthPerIPPerMinute: cfg.HTTP.AuthPerIPPerMinute,
 	})
 
+	// Release waiting long-polls once the listeners are closed: the dispatcher stops with
+	// ctx, so they would otherwise sit out their full timeout before the client moves on.
+	srv.RegisterOnShutdown(registry.Close)
+
 	// Start server in background.
 	errCh := make(chan error, 1)
 	go func() {
@@ -237,8 +253,8 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 		return fmt.Errorf("server: %w", err)
 	}
 
-	// Graceful shutdown: 30s for in-flight requests (including long-poll /sync).
-	// /sync goroutines unblock immediately via ctx.Done().
+	// Graceful shutdown: 30s for in-flight requests. Waiting /sync long-polls return at
+	// once (registry.Close above).
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

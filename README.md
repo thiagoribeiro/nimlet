@@ -334,8 +334,10 @@ Rules:
 - **Registration is off by default.** New namespaces do not accept public `/register`
   (403 `REGISTRATION_CLOSED`) until an operator enables it. Accounts can also be created with the
   admin CLI.
-- **Disabling a namespace stops it at once.** Login, every authenticated request (including
-  `/sync`) and its AppServices stop working, and the other namespaces are unaffected.
+- **Disabling a namespace stops it within a second.** Login, every authenticated request
+  (including `/sync`) and its AppServices stop working, and the other namespaces are unaffected.
+  Instances reuse a session lookup for up to `NIMLET_AUTH_CACHE_TTL_MS` (1s), so disabling a
+  namespace, user or device, or revoking a session, takes that long to reach every instance.
 - **Infrastructure is shared.** Namespaces share Postgres, Redis and the process. This is
   isolation of data and authorization, not of resources or failures.
 
@@ -898,8 +900,16 @@ All configuration is via environment variables.
 | `NIMLET_HTTP_TRUST_PROXY_HEADERS` | `false` | Take the client IP from `X-Forwarded-For`/`X-Real-IP`; enable only behind a proxy that sets them |
 | `NIMLET_DB_DSN` | *(required)* | PostgreSQL connection string |
 | `NIMLET_AUTO_MIGRATE` | `true` | Apply pending migrations at server startup; set `false` when the server's DB role has no DDL rights |
-| `NIMLET_DB_MAX_CONNS` | `max(50, NumCPU×4)` | Max DB pool connections per instance |
+| `NIMLET_PROFILE` | `large` | Instance size preset for the variables below: `small` (≤0.5 CPU), `medium` (1-2 CPUs), `large` (2+ CPUs); see [Sizing](#sizing) |
+| `NIMLET_DB_MAX_CONNS` | profile (`small` 12, `medium` 16, `large` `max(50, NumCPU×4)`) | Max DB pool connections per instance |
+| `NIMLET_EVENT_BATCH_MAX` | `64` | Sends written per transaction (group commit); `1` disables batching |
+| `NIMLET_EVENT_BATCH_WORKERS` | profile (1 / 1 / 4) | Send batches in flight per instance |
+| `NIMLET_EVENT_BATCH_WAIT_US` | profile (2000 / 1000 / 0) | µs a send batch waits for more sends after its first |
+| `NIMLET_SYNC_READ_MAX` | `64` | Concurrent `/sync` queries run as one statement; `1` disables grouping |
+| `NIMLET_SYNC_READ_WORKERS` | profile (1 / 1 / 8) | `/sync` query groups in flight per instance |
+| `NIMLET_SYNC_READ_WAIT_US` | profile (2000 / 1000 / 0) | µs a query group waits for more queries after its first |
 | `NIMLET_AUTH_HMAC_SECRET` | *(required, ≥32 chars)* | Secret for HMAC token signing |
+| `NIMLET_AUTH_CACHE_TTL_MS` | `1000` | How long an instance reuses a session lookup; revocations and disables reach other instances within this time (`0` disables the cache) |
 | `NIMLET_REDIS_ADDR` | `localhost:6379` | Redis address |
 | `NIMLET_REDIS_PASSWORD` | | Redis password |
 | `NIMLET_REDIS_DB` | `0` | Redis database index |
@@ -918,6 +928,21 @@ Admin CLI only (never set these on the server): `NIMLET_ADMIN_DB_DSN` (required)
 Kubernetes and the threat model: [`docs/operations.md`](docs/operations.md).
 
 **Multi-instance note:** set `NIMLET_DB_MAX_CONNS` to `max_postgres_connections / num_instances` to avoid exhausting the Postgres connection limit.
+
+### Sizing
+
+Pick `NIMLET_PROFILE` by the CPU each instance gets. Any variable set explicitly still wins.
+
+| Profile | Per instance | Why |
+|---|---|---|
+| `small` | ≤0.5 CPU, many instances | Each instance sees little concurrent load, so it waits up to 2ms to fill write batches and `/sync` query groups, and keeps 1 worker each and 12 connections. More workers or connections only add Postgres planning and contention. |
+| `medium` | 1-2 CPUs | Same shape, with 1ms waits and 16 connections. |
+| `large` | 2+ CPUs, few instances | Enough concurrent load to fill groups without waiting; needs the parallelism (4 write and 8 read workers). |
+
+Postgres 18 is recommended: `/sync` touches every `events` / `event_visibility` partition, more
+locks than the 16 fast-path slots of earlier versions, and the shared lock manager then becomes
+the bottleneck. On 18, set `max_locks_per_transaction=256` (it also sizes the fast-path slots).
+Measurements behind these values: [`docs/benchmarks.md`](docs/benchmarks.md), phase 04.
 
 ### Metrics
 
@@ -1002,6 +1027,19 @@ media-heavy deployment:
 ```
 
 PostgreSQL is always the source of truth. Redis improves latency, not correctness.
+
+**Measured** ([`docs/benchmarks.md`](docs/benchmarks.md), phase 04; one laptop, Postgres on 3 cores, instances on 2):
+
+- **Single instance:** one instance on 2 cores sustains 2500 msg/s into rooms of 20, which is
+  50k deliveries/s at delivery p99 under 500ms.
+- **Scaling out on the same 2 cores:** splitting them into 1 → 8 instances of 0.25 CPU raises
+  capacity 10.7× for sync-heavy load (150 → 1600 msg/s) and 3.1× for send-heavy load
+  (1600 → 5000 msg/s). The ceiling is then the shared Postgres (96–99% CPU).
+- **Changes and failures:** adding and removing instances, `kill -9` of an instance, and
+  restarting Redis or Postgres under load lost, duplicated or reordered nothing, across 78M
+  checked deliveries. Sends are retried with the same txnId.
+- **Sizing:** recommended configurations per system size are in
+  [`docs/benchmarks.md`](docs/benchmarks.md#recommended-configurations) and [Sizing](#sizing).
 
 For horizontal scaling, each instance subscribes to all `NIMLET_SYNC_PARTITIONS` channels. Notifications received by instances without matching local waiters are silently discarded — this is correct Pub/Sub fan-out behavior. Future work: Redis Streams with consumer groups to avoid duplicate processing.
 

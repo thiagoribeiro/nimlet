@@ -1,0 +1,5 @@
+time="2026-10-27T14:03:38-03:00" level=error msg="User-selected graph driver \"overlay\" overwritten by graph driver \"vfs\" from database - delete libpod local files (\"/home/thiago/.local/share/containers/storage\") to resolve.  May prevent use of images created by other tools"
+time="2026-10-27T14:03:38-03:00" level=error msg="User-selected graph driver \"overlay\" overwritten by graph driver \"vfs\" from database - delete libpod local files (\"/home/thiago/.local/share/containers/storage\") to resolve.  May prevent use of images created by other tools"
+instance 5 not ready
+time="2026-10-27T14:03:59-03:00" level=error msg="User-selected graph driver \"overlay\" overwritten by graph driver \"vfs\" from database - delete libpod local files (\"/home/thiago/.local/share/containers/storage\") to resolve.  May prevent use of images created by other tools"
+error: redis: redis: ping: i/o timeout

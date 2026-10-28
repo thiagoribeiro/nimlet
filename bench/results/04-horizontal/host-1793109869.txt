@@ -1,0 +1,22 @@
+commit 3c63902 2026-10-27T11:04:29-03:00
+ 11:04:29 up 2 days,  2:52,  1 user,  load average: 11,51, 10,59, 7,45
+top - 11:04:29 up 2 days,  2:52,  1 user,  load average: 11,51, 10,59, 7,45
+Tasks: 435 total, 1 running, 434 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  2,4 us,  1,8 sy,  0,0 ni, 95,8 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st 
+MiB Mem :  15265,2 total,    551,2 free,   7675,3 used,   9041,1 buff/cache     
+MiB Swap:  12212,0 total,   9876,0 free,   2336,0 used.   7589,9 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+ 762854 thiago    20   0  180384  35916  21348 S   4,9   0,2  23:46.85 herdr
+4048837 thiago    20   0 5661716 384876  86716 S   4,9   2,5  15:17.82 claude
+      1 root      20   0   22524  13212   8416 S   0,0   0,1   0:07.45 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.07 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     11 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     14 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     15 root      20   0       0      0      0 S   0,0   0,0   0:03.11 ksoftir+

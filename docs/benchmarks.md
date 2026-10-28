@@ -404,3 +404,127 @@ For all sizes:
   stays warm.
 - Drain an instance in the LB before stopping it. It is no longer required for correctness or
   latency, but it avoids a burst of re-routed requests.
+
+## 05 — batching (`bench/results/05-batching`)
+
+Branch `bench/batching`. The question: would sends commit faster if a batch ran in **one**
+transaction that takes the allocation lock, allocates positions and `room_seq`s, inserts and
+commits, with bigger batches (100 sends or 20ms)? Today a batch uses two transactions:
+- a short allocation transaction (advisory lock, `nextval`, `room_seqs`, `stream_inflight`
+  markers);
+- the insert, whose commit carries the WAL flush.
+
+Same environment and protocol as phase 04: Postgres in `/dev/shm`, three repetitions, median
+(min–max). Harness: `bench/batching.sh` (variants) and `bench/pgprofile.sh`
+(`pg_stat_statements` per send).
+
+| Variant | Env on top of the profile |
+|---|---|
+| A — baseline | phase-04 code: 64 sends per batch, profile waits (2 / 1 / 0 ms) |
+| B — bigger batches | `NIMLET_EVENT_BATCH_MAX=100 NIMLET_EVENT_BATCH_WAIT_US=20000` |
+| C — one transaction | `NIMLET_EVENT_BATCH_MODE=single` (lock held until the commit, no `stream_inflight`) |
+| D — the full proposal | C + B |
+| E — B, waiting only under load | B on a queue that waits only after a batch of more than one send (commit `perf(events)` below) |
+
+### Send-heavy capacity, N × 0.25 CPU (msg/s)
+
+| N | A | B | C | D | E |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 1600 | 2000 | 1600 | 2000 | 2000 (1600–2000) |
+| 2 | 3000 | 3000 (2500–3000) | 3000 | 3000 | 3000 |
+| 4 | 4000 | 5000 (4000–5000) | 4000 | 5000 (4000–5000) | 4000 (4000–5000) |
+| 8 | 5000 | 6000 | 4000 | 5000 | 6000 |
+
+### Sync-heavy capacity per profile (msg/s)
+
+| Profile | A | B | C | D | E |
+|---|---:|---:|---:|---:|---:|
+| `small` 8 × 0.25 | 1300 | 1300 | 1000 (800–1000) | 1000 | 1300 (1000–1300) |
+| `medium` 2 × 1 | 2500 | 3000 | 2500 | 3000 | 3000 (2500–3000) |
+| `large` 1 × 2 | 2000 | 2000 (2000–2500) | 1600 | 1600 | 2500 (1300–2500) |
+
+A's sync-heavy numbers are below phase 04 (small 1600, large 2500). This branch is based on the
+public `main`, which has commits phase 04 didn't, among them a `/sync` presence change. The
+variants all share one commit, so the comparison holds; the drop is a separate lead.
+
+### Send latency at low load (send-heavy N=4, first steps)
+
+| Rate msg/s | A p50 / p99 ms | B | E |
+|---:|---:|---:|---:|
+| 200 | 3.1 / 5 | 21.3 / 25 | 0.8 / 2 |
+| 400 | 3.7 / 8 | 17.4 / 26 | 0.8 / 15 |
+| 800 | 4.7 / 20 | 15.9 / 31 | 12.4 / 29 |
+
+B pays the full 20ms on every send of an idle instance. E only waits once batches already have
+company, so it is faster than A when idle and close to B under load.
+
+### Where Postgres time goes (8 × 0.25 `small`, 4000 msg/s)
+
+| Variant | Result | send p99 | Postgres ms per send | sends per insert batch | Postgres busy |
+|---|---|---:|---:|---:|---:|
+| A | pass | 120ms | 1.47 | 9.1 | 89% |
+| B | pass | 119ms | 1.29 | 19.3 | 86% |
+| C | **fail** (delivery p99 3.3s) | – | 2.45 | 51.4 | 81% |
+| D | pass | 251ms | 1.92 | 45.6 | 81% |
+
+In C each insert batch is 3.5× cheaper per event (~0.19 vs ~0.68ms), but batches wait on
+average 87ms for the lock (D: 57ms; A: 0.6ms). Holding the lock through the insert and its WAL
+flush makes the whole cluster insert one batch at a time. Postgres is then idler and slower.
+
+### Disk (`disk-*`, send-heavy N=4, Postgres on the laptop NVMe)
+
+Inconclusive. The three repetitions of A, C and D ranged from 0 to 3000 msg/s, with 1–2s
+stalls already at 200 msg/s: the fsync tails of phase 04. C and D were never better than A. On
+disks whose flush stalls, C/D make it worse by construction, since one stalled flush blocks
+every instance's next batch.
+
+### Decision
+
+- **One transaction (C/D): no.** It loses capacity in RAM and makes the cluster depend on a
+  single flush at a time. `NIMLET_EVENT_BATCH_MODE=single` stays as an opt-in for experiments;
+  the default remains `split`.
+- **Bigger batches: yes, waiting only under load (E).** The group queue now waits `MaxWait`
+  only after a group of more than one request; that applies to `/sync` read groups too. Send
+  batches default to 100 sends / 20ms on every profile. Result: +25% send-heavy capacity at N=1
+  and +20% at N=8 over A, and lower latency when idle.
+
+### Failures with the new defaults (`faults/`, 400 msg/s on 4 instances)
+
+| Fault | Failed sends | Send retries | Sync errors | Reconnect max | Delivery max | Lost / late / dup (client, Postgres) / reordered |
+|---|---:|---:|---:|---:|---:|---|
+| `kill -9` one instance | 0 | 12 | 11 | 570ms | 936ms | 0 / 0 / 0, 0 / 0 |
+| Redis paused 10s | 0 | 0 | 0 | – | 11.1s | 0 / 0 / 0, 0 / 0 |
+| Redis restarted | 0 | 0 | 0 | – | 649ms | 0 / 0 / 0, 0 / 0 |
+| Postgres restarted | 0 | 198 | 676 | 1.6s | **31.3s** | 0 / 0 / 0, 0 / 0 |
+| Instance booted while Redis is down | 0 | 0 | 0 | – | 11.1s | 0 / 0 / 0, 0 / 0 |
+
+**Postgres restart froze every reader for 30s.** For 30s after the restart, sends were acked but
+every `/sync` came back empty. Then everything arrived at once (250k deliveries at p99 30s).
+Nothing was lost, but delivery stopped cluster-wide. The sequence:
+1. Postgres went down after a batch had committed its allocation and before its insert ran.
+2. The batch's release of its `stream_inflight` markers failed too, because Postgres was down.
+3. `stream_inflight` is UNLOGGED, which empties it after a crash but not after a clean shutdown,
+   so the markers outlived the restart.
+4. Readers stopped below them until they aged out (`inflightAbandonAfter`, 30s).
+
+Phase 04 had the same window. Bigger batches only make it likelier.
+
+Fix (`fix(events)`): markers allocated before `pg_postmaster_start_time()` are dead. Readers
+ignore them, and writers apply the same bound to their allocation check, so an ignored marker
+can never commit later. The sweeper removes them.
+
+The race is timing-dependent: two restarts on the old code didn't hit it
+(`pgrestart-before-r*`). It reproduces deterministically by hand:
+1. Insert a marker.
+2. Run `podman restart` on Postgres.
+3. Check the marker: it survived, the old ceiling is `0` (hiding everything), and the new one is
+   unbounded.
+
+Three restarts with the fix (`pgrestart-after-r*`): delivery max 0.9–1.0s, 0 lost or duplicated.
+
+**Keeping `stream_inflight` in Redis instead** (INCRBY for positions, a committed-pointer and a
+list of committed positions waiting for a predecessor, rebuilt from Postgres when Redis restarts)
+is the split protocol moved out of Postgres. Its allocation share is ~7–10% of Postgres time in
+this profile, which bounds the gain. In exchange Redis would become the source of truth for
+ordering, with new failure modes: a crash between the Postgres commit and the Redis update, epoch
+fencing when Redis restarts, and keeping `room_seq` atomic with the position. Not pursued.

@@ -1,0 +1,23 @@
+commit 897a28c 2026-10-28T03:38:09-03:00
+variant: none PG_RAM=1
+ 03:38:09 up 2 days, 19:26,  1 user,  load average: 1,26, 4,81, 6,78
+top - 03:38:09 up 2 days, 19:26,  1 user,  load average: 1,26, 4,81, 6,78
+Tasks: 364 total, 1 running, 363 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  1,8 us,  0,6 sy,  0,0 ni, 97,6 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st 
+MiB Mem :  15265,2 total,   2500,5 free,   5697,2 used,   8920,5 buff/cache     
+MiB Swap:  12212,0 total,   9741,9 free,   2470,1 used.   9568,0 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+2610447 thiago    20   0   53,0g  41876  39260 S   4,9   0,3   6:21.34 nimchat
+4048837 thiago    20   0 5661716 384340  73300 S   4,9   2,5  27:55.94 claude
+      1 root      20   0   22524  12848   8080 S   0,0   0,1   0:10.53 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.10 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     11 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     14 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     15 root      20   0       0      0      0 S   0,0   0,0   0:04.58 ksoftir+

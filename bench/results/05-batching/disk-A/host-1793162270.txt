@@ -1,0 +1,23 @@
+commit 0b72b07 2026-10-28T01:37:50-03:00
+variant: none PG_RAM=
+ 01:37:50 up 2 days, 17:25,  1 user,  load average: 23,35, 14,66, 10,07
+top - 01:37:51 up 2 days, 17:25,  1 user,  load average: 23,35, 14,66, 10,07
+Tasks: 368 total, 1 running, 367 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  2,9 us,  1,2 sy,  0,0 ni, 94,7 id,  0,0 wa,  0,6 hi,  0,6 si,  0,0 st 
+MiB Mem :  15265,2 total,   2084,4 free,   7660,2 used,   9448,2 buff/cache     
+MiB Swap:  12212,0 total,   9604,4 free,   2607,6 used.   7605,0 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+2610533 thiago    20   0 1448,2g 107496  42116 S  14,6   0,7  16:36.40 nimchat
+    665 root      20   0 1934180  32508   9820 S   4,9   0,2  12:37.20 tailsca+
+   2648 thiago    20   0 1007220  35456  26948 S   4,9   0,2  64:29.72 waybar
+ 762854 thiago    20   0  182312  31284  21104 S   4,9   0,2  34:56.24 herdr
+2610453 thiago    20   0   52,4g  34960  31720 S   4,9   0,2   0:52.57 nimchat
+      1 root      20   0   22524  12160   8096 S   0,0   0,1   0:10.02 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.10 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+

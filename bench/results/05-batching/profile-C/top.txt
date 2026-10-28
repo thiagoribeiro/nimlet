@@ -1,0 +1,20 @@
+267621 | 3086 | 86.721 | SELECT pg_advisory_xact_lock($1)
+70194 | 17995 | 3.901 | WITH ceiling AS ( SELECT COALESCE(min(pos) - $4, $5) AS pos FROM stream_inflight WHERE allocated_at > clock_timestamp() 
+17352 | 1651 | 10.510 | WITH input AS ( SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[
+13179 | 1422 | 9.268 | WITH input AS ( SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[
+5524 | 12168 | 0.454 | WITH ceiling AS ( SELECT COALESCE(min(pos) - $4, $5) AS pos FROM stream_inflight WHERE allocated_at > clock_timestamp() 
+4695 | 158045 | 0.030 | SELECT namespace_id, room_id, user_id, state, role, updated_at FROM room_memberships WHERE room_id = $1 AND user_id = $2
+3374 | 158045 | 0.021 | SELECT id, namespace_id, name, creator_id, created_at, member_count, join_rule, direct_key, alias, expires_at FROM rooms
+2384 | 316110 | 0.008 | SELECT $2 FROM ONLY "public"."rooms" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+1577 | 8443 | 0.187 | SELECT s.id, s.namespace_id, s.device_id, s.user_id, s.token_hash, s.expires_at, s.created_at, d.disabled, u.disabled, n
+864 | 3073 | 0.281 | INSERT INTO room_seqs (room_id, last_seq) SELECT * FROM unnest($1::text[], $2::bigint[]) ON CONFLICT (room_id) DO UPDATE
+274 | 3073 | 0.089 | SELECT nextval($2) FROM generate_series($3, $1::int)
+90 | 13 | 6.922 | WITH idem AS ( INSERT INTO event_idempotency (txn_key, stream_pos, event_id, created_at) VALUES ($1, $2, $3, $4) ON CONF
+46 | 100 | 0.463 | SELECT r.id FROM rooms r JOIN room_memberships m ON m.room_id = r.id WHERE m.user_id = $1 AND m.state = $2 AND r.member_
+3 | 13 | 0.248 | INSERT INTO room_seqs (room_id, last_seq) VALUES ($1, $2) ON CONFLICT (room_id) DO UPDATE SET last_seq = room_seqs.last_
+2 | 96 | 0.016 | COMMIT
+2 | 13 | 0.117 | INSERT INTO stream_inflight (pos) VALUES (nextval($1)) RETURNING pos
+0 | 1 | 0.046 | SELECT pg_stat_statements_reset()
+0 | 0 |  | NOT ok
+0 | 0 |  | SELECT round((total_exec_time + total_plan_time)::numeric) AS ms, calls, round(((total_exec_time + total_plan_time) / nu
+0 | 0 |  | $1

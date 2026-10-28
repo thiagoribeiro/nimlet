@@ -9,7 +9,7 @@
 # 4,7), PG_CPUS (0-2), REDIS_CPUS (7), plus bench/cluster.sh's INST_CPUS (5-6), LB_CPUS (3) and
 # CPU_PER_INSTANCE (0.25). Postgres is 18 with max_locks_per_transaction=256 (docs, phase 04).
 # A/B knobs (phase 05): VARIANT_ENV ("KEY=VALUE ..." added to every instance on top of the
-# profile), SCALE_WORKLOADS ("sync send") and SCALE_NS ("1 2 4 8").
+# profile), SCALE_WORKLOADS ("sync send"), SCALE_NS ("1 2 4 8") and FAULTS (names, default all).
 set -eu
 cd "$(dirname "$0")/.."
 NAME=$1
@@ -192,7 +192,7 @@ redistrib() {
 faults() {
 	d="$OUT/faults"
 	mkdir -p "$d"
-	for fault in kill-instance pause-redis restart-redis restart-postgres boot-without-redis; do
+	for fault in ${FAULTS:-kill-instance pause-redis restart-redis restart-postgres boot-without-redis}; do
 		fresh "$d" "$WL_SYNC"
 		bench/cluster.sh up 4
 		: > "$d/events.txt"

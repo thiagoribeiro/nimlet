@@ -1,0 +1,23 @@
+commit 897a28c 2026-10-28T03:48:55-03:00
+variant: none PG_RAM=1
+ 03:48:55 up 2 days, 19:36,  1 user,  load average: 7,04, 7,01, 7,05
+top - 03:48:56 up 2 days, 19:36,  1 user,  load average: 7,04, 7,01, 7,05
+Tasks: 364 total, 1 running, 363 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  1,8 us,  1,8 sy,  0,0 ni, 95,9 id,  0,0 wa,  0,6 hi,  0,0 si,  0,0 st 
+MiB Mem :  15265,2 total,   2240,3 free,   5679,8 used,   9134,6 buff/cache     
+MiB Swap:  12212,0 total,   9742,7 free,   2469,3 used.   9585,4 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   2349 thiago    20   0 1141628  46968  35600 S   4,9   0,3  35:14.06 Hyprland
+   3108 thiago     9 -11  186092  20856   8928 S   4,9   0,1  35:36.95 pipewir+
+ 762854 thiago    20   0  182304  34228  21072 S   4,9   0,2  36:21.98 herdr
+ 763015 thiago    20   0 1833512  10612   4676 S   4,9   0,1   9:31.19 herdr-a+
+      1 root      20   0   22524  12848   8080 S   0,0   0,1   0:10.60 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.10 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     11 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+

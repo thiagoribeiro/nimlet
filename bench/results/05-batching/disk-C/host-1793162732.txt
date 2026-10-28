@@ -1,0 +1,23 @@
+commit 0b72b07 2026-10-28T01:45:32-03:00
+variant: NIMLET_EVENT_BATCH_MODE=single PG_RAM=
+ 01:45:32 up 2 days, 17:33,  1 user,  load average: 5,04, 7,40, 8,23
+top - 01:45:32 up 2 days, 17:33,  1 user,  load average: 5,04, 7,40, 8,23
+Tasks: 375 total, 1 running, 374 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  1,8 us,  0,6 sy,  0,0 ni, 96,4 id,  0,6 wa,  0,6 hi,  0,0 si,  0,0 st 
+MiB Mem :  15265,2 total,   3636,9 free,   4940,4 used,   7937,2 buff/cache     
+MiB Swap:  12212,0 total,   9660,7 free,   2551,3 used.  10324,8 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+3902669 100069    20   0  223916 111408 107940 S   4,9   0,7   0:00.30 postgres
+      1 root      20   0   22524  12160   8096 S   0,0   0,1   0:10.06 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.10 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     11 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     14 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     15 root      20   0       0      0      0 S   0,0   0,0   0:04.39 ksoftir+
+     16 root      -2   0       0      0      0 I   0,0   0,0   2:17.96 rcu_pre+

@@ -729,10 +729,15 @@ service-account key — no third-party push relay in the delivery path.
 **Presence.** Each `/sync` marks its user as connected in an ephemeral Redis key
 (`presence:{userID}`) for the length of the long-poll, and when the request returns, or the
 client aborts it, the mark lasts only a 10-second grace period (time for a connected client
-to open its next long-poll). A user who closes the app is pushed within seconds. Pushes skip
+to open its next long-poll). A user who closes the app is pushed within seconds. Requests
+don't wait for Redis: each instance writes presence in the background, pipelined. It skips the
+end of a `/sync` when the same user's next long-poll begins within a second, and only
+rewrites a key when it gets close to expiring. An active client costs a write every few
+seconds instead of two per `/sync`, and a user who left becomes absent about 11s later. Pushes skip
 recipients who are present: anyone with an open `/sync` already gets the event live.
 Presence is per user, so one connected device silences pushes to all of them; when two
-devices are connected and one leaves, at most one redundant push may go out. Like the wake-up bus, presence is best-effort: a lookup failure
+devices are connected through different instances and one leaves, at most one redundant push
+may go out. Like the wake-up bus, presence is best-effort: a lookup failure
 or an expired key fails open (send the push anyway), never silent (skip a push that should
 have fired).
 

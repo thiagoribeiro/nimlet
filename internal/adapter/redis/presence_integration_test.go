@@ -64,3 +64,27 @@ func TestPresence_EndWithoutBeginIsANoop(t *testing.T) {
 	require.NoError(t, s.End(ctx, user))
 	assert.False(t, present(t, s, user))
 }
+
+func TestPresenceWriter_WritesInTheBackground(t *testing.T) {
+	addr := os.Getenv("TEST_REDIS_ADDR")
+	if addr == "" {
+		t.Skip("TEST_REDIS_ADDR not set")
+	}
+	client, err := redis.NewClient(addr, "", 0)
+	require.NoError(t, err)
+	w := redis.NewPresenceWriter(client)
+	ctx, user := context.Background(), uuid.NewString()
+	key := "nimlet:presence:" + user
+
+	require.NoError(t, w.Begin(ctx, user, time.Minute))
+	require.Eventually(t, func() bool { ok, _ := w.IsPresent(ctx, user); return ok },
+		time.Second, 5*time.Millisecond, "Begin reaches Redis")
+
+	require.NoError(t, w.End(ctx, user))
+	require.Eventually(t, func() bool { return client.PTTL(ctx, key).Val() <= redis.PresenceGrace },
+		redis.PresenceEndDelay+time.Second, 20*time.Millisecond, "End shortens the key after the delay")
+
+	require.NoError(t, w.Begin(ctx, user, time.Minute))
+	w.Close()
+	assert.LessOrEqual(t, client.PTTL(ctx, key).Val(), redis.PresenceGrace, "Close ends the open long-poll's presence")
+}

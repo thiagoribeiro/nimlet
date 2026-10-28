@@ -1,0 +1,64 @@
+{
+  "capacity": 100,
+  "errors": null,
+  "listeners": 2000,
+  "members": 2000,
+  "reconnect_max_ms": 0,
+  "reconnect_p99_ms": 0,
+  "reconnects": 0,
+  "reliability": {
+    "attempted": 5997,
+    "acked": 5997,
+    "failed": 0,
+    "expected": 119940,
+    "delivered_live": 119940,
+    "delivered_late": 0,
+    "lost": 0,
+    "unacked_delivered": 0,
+    "redelivered": 0,
+    "double_insert": 0,
+    "reorders": 0
+  },
+  "rooms": 100,
+  "run": "dmgg7hpsrx64",
+  "senders": 100,
+  "slo_ms": 500,
+  "step_duration_s": 20,
+  "steps": [
+    {
+      "rate": 100,
+      "achieved": 99.95,
+      "acked": 1999,
+      "failed": 0,
+      "retries": 0,
+      "shed": 0,
+      "delivered": 39980,
+      "expected": 39980,
+      "send_p50_ms": 22.79,
+      "send_p99_ms": 109.834,
+      "delivery_p50_ms": 38.827,
+      "delivery_p99_ms": 199.158,
+      "pass": true
+    },
+    {
+      "rate": 150,
+      "achieved": 149.95,
+      "acked": 2999,
+      "failed": 0,
+      "retries": 0,
+      "shed": 0,
+      "delivered": 59980,
+      "expected": 59980,
+      "send_p50_ms": 52.939,
+      "send_p99_ms": 338.989,
+      "delivery_p50_ms": 773.287,
+      "delivery_p99_ms": 1320.066,
+      "pass": false,
+      "fail_reasons": [
+        "delivery p99 1.32s\u003eslo"
+      ]
+    }
+  ],
+  "sync_calls": 113227,
+  "sync_errors": 0
+}

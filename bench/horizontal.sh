@@ -8,6 +8,8 @@
 # step), ELASTIC_RATE / FAULT_RATE (msg/s of the constant-load experiments), LG_CPUS (loadgen,
 # 4,7), PG_CPUS (0-2), REDIS_CPUS (7), plus bench/cluster.sh's INST_CPUS (5-6), LB_CPUS (3) and
 # CPU_PER_INSTANCE (0.25). Postgres is 18 with max_locks_per_transaction=256 (docs, phase 04).
+# A/B knobs (phase 05): VARIANT_ENV ("KEY=VALUE ..." added to every instance on top of the
+# profile), SCALE_WORKLOADS ("sync send"), SCALE_NS ("1 2 4 8") and FAULTS (names, default all).
 set -eu
 cd "$(dirname "$0")/.."
 NAME=$1
@@ -28,7 +30,8 @@ export NIMLET_BENCH_PG_IMAGE=${NIMLET_BENCH_PG_IMAGE:-docker.io/library/postgres
 # instance a quota (0.25 CPU, the "small" profile) that makes N matter: 8 of them fill the two
 # instance cores that the single-instance reference gets whole.
 export CPU_PER_INSTANCE=${CPU_PER_INSTANCE-0.25}
-export NIMLET_ENV=${NIMLET_ENV-NIMLET_PROFILE=small}
+VARIANT_ENV=${VARIANT_ENV:-}
+export NIMLET_ENV="${NIMLET_ENV-NIMLET_PROFILE=small} $VARIANT_ENV"
 LG_CPUS=${LG_CPUS:-4,7}
 REPS=${REPS:-3}
 STEP_DURATION=${STEP_DURATION:-20s}
@@ -53,6 +56,7 @@ bench/cluster.sh build
 # What else was running: the host isn't isolated, so record it with the results.
 {
 	echo "commit $(git rev-parse --short HEAD) $(date -Is)"
+	echo "variant: ${VARIANT_ENV:-none} PG_RAM=${PG_RAM:-}"
 	uptime
 	top -bn1 -o %CPU | head -20
 } > "$OUT/host-$(date +%s).txt"
@@ -104,7 +108,7 @@ sizes() {
 		[ "$quota" = - ] && quota=""
 		for rep in $(seq 1 "$REPS"); do
 			fresh "$d" "$WL_SYNC"
-			CPU_PER_INSTANCE="$quota" NIMLET_ENV="NIMLET_PROFILE=$prof" bench/cluster.sh up "$n"
+			CPU_PER_INSTANCE="$quota" NIMLET_ENV="NIMLET_PROFILE=$prof $VARIANT_ENV" bench/cluster.sh up "$n"
 			# shellcheck disable=SC2086
 			loadgen "$d" "$prof-n$n-r$rep" $WL_SYNC -steps "$REF_STEPS" -duration "$STEP_DURATION"
 		done
@@ -115,9 +119,9 @@ sizes() {
 scale() {
 	d="$OUT/scale"
 	mkdir -p "$d"
-	for wl in sync send; do
+	for wl in ${SCALE_WORKLOADS:-sync send}; do
 		if [ "$wl" = sync ]; then args=$WL_SYNC steps=$SYNC_STEPS; else args=$WL_SEND steps=$SEND_STEPS; fi
-		for n in 1 2 4 8; do
+		for n in ${SCALE_NS:-1 2 4 8}; do
 			for rep in $(seq 1 "$REPS"); do
 				fresh "$d" "$args"
 				bench/cluster.sh up "$n"
@@ -188,7 +192,7 @@ redistrib() {
 faults() {
 	d="$OUT/faults"
 	mkdir -p "$d"
-	for fault in kill-instance pause-redis restart-redis restart-postgres boot-without-redis; do
+	for fault in ${FAULTS:-kill-instance pause-redis restart-redis restart-postgres boot-without-redis}; do
 		fresh "$d" "$WL_SYNC"
 		bench/cluster.sh up 4
 		: > "$d/events.txt"

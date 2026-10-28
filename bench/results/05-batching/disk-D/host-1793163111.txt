@@ -1,0 +1,23 @@
+commit 0b72b07 2026-10-28T01:51:51-03:00
+variant: NIMLET_EVENT_BATCH_MODE=single NIMLET_EVENT_BATCH_MAX=100 NIMLET_EVENT_BATCH_WAIT_US=20000 PG_RAM=
+ 01:51:51 up 2 days, 17:39,  1 user,  load average: 5,54, 5,22, 6,79
+top - 01:51:52 up 2 days, 17:39,  1 user,  load average: 5,54, 5,22, 6,79
+Tasks: 375 total, 1 running, 374 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  1,2 us,  0,6 sy,  0,0 ni, 98,2 id,  0,0 wa,  0,0 hi,  0,0 si,  0,0 st 
+MiB Mem :  15265,2 total,   3350,2 free,   5031,0 used,   8100,7 buff/cache     
+MiB Swap:  12212,0 total,   9661,3 free,   2550,7 used.  10234,3 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+3936934 thiago    20   0 5661716 296904  58760 S   4,9   1,9  22:23.87 claude
+      1 root      20   0   22524  12864   8096 S   0,0   0,1   0:10.10 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.10 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     11 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     14 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     15 root      20   0       0      0      0 S   0,0   0,0   0:04.40 ksoftir+
+     16 root      -2   0       0      0      0 I   0,0   0,0   2:18.33 rcu_pre+

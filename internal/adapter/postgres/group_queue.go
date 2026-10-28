@@ -12,8 +12,12 @@ type GroupLimits struct {
 	// MaxItems caps the requests in one group; <= 1 disables grouping.
 	MaxItems int
 	// MaxWait: zero takes only what is already queued. Under load requests pile up while
-	// the workers are busy, so groups still grow, and an idle server adds no latency.
+	// the workers are busy, so groups still grow. A worker only waits after a group of more
+	// than one request: a lone request on an idle server never pays MaxWait.
 	MaxWait time.Duration
+	// WaitAlways makes a lone request wait MaxWait too, so that requests sent together
+	// reliably share a group (tests).
+	WaitAlways bool
 	// Workers is the number of groups in flight at once.
 	Workers int
 }
@@ -59,6 +63,7 @@ func (q *groupQueue[T]) close() {
 func (q *groupQueue[T]) worker(run func([]T)) {
 	defer q.stopped.Done()
 	group := make([]T, 0, q.limits.MaxItems)
+	loaded := q.limits.WaitAlways
 	for {
 		select {
 		case <-q.stop:
@@ -66,12 +71,16 @@ func (q *groupQueue[T]) worker(run func([]T)) {
 		case r := <-q.reqs:
 			group = append(group[:0], r)
 		}
-		run(q.fill(group))
+		group = q.fill(group, loaded)
+		loaded = q.limits.WaitAlways || len(group) > 1
+		run(group)
 	}
 }
 
-func (q *groupQueue[T]) fill(group []T) []T {
-	if q.limits.MaxWait <= 0 {
+// fill adds requests to group up to MaxItems. It waits up to MaxWait for them only when
+// linger is set (the previous group had company); otherwise it takes what is queued.
+func (q *groupQueue[T]) fill(group []T, linger bool) []T {
+	if q.limits.MaxWait <= 0 || !linger {
 		for len(group) < q.limits.MaxItems {
 			select {
 			case r := <-q.reqs:

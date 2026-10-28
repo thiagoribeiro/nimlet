@@ -1,0 +1,23 @@
+commit 897a28c 2026-10-28T03:46:14-03:00
+variant: none PG_RAM=1
+ 03:46:14 up 2 days, 19:34,  1 user,  load average: 5,72, 6,58, 6,94
+top - 03:46:14 up 2 days, 19:34,  1 user,  load average: 5,27, 6,47, 6,90
+Tasks: 366 total, 1 running, 365 sleep, 0 d-sleep, 0 stopped, 0 zombie
+%Cpu(s):  1,2 us,  0,6 sy,  0,0 ni, 97,6 id,  0,0 wa,  0,0 hi,  0,6 si,  0,0 st 
+MiB Mem :  15265,2 total,   2319,7 free,   5673,7 used,   9061,9 buff/cache     
+MiB Swap:  12212,0 total,   9742,5 free,   2469,5 used.   9591,5 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   3083 thiago    20   0  239896   4896   3620 S   4,9   0,0  57:21.61 cava
+      1 root      20   0   22524  12848   8080 S   0,0   0,1   0:10.58 systemd
+      2 root      20   0       0      0      0 S   0,0   0,0   0:00.10 kthreadd
+      3 root      20   0       0      0      0 S   0,0   0,0   0:00.00 pool_wo+
+      4 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      5 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      6 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      7 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+      8 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     11 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     14 root       0 -20       0      0      0 I   0,0   0,0   0:00.00 kworker+
+     15 root      20   0       0      0      0 S   0,0   0,0   0:04.60 ksoftir+
+     16 root      -2   0       0      0      0 I   0,0   0,0   2:26.65 rcu_pre+

@@ -72,6 +72,10 @@ database binds it, and the restart fails with "address already in use".
 `bench/horizontal.sh <name> [sizes scale elastic redistrib faults]` runs the phase-04 experiments
 into `bench/results/<name>/`. A full run takes about three hours.
 
+`bench/batching.sh [ram] [disk] [profile]` runs the phase-05 write-path variants on top of
+`horizontal.sh` (`VARIANTS='A B'` picks some), and `bench/pgprofile.sh <dir>` reports Postgres
+milliseconds per send from `pg_stat_statements`.
+
 `horizontal.sh` sets `PG_RAM=1`, which keeps the Postgres data directory in `/dev/shm`. Commits
 still fsync, but at memory speed. On the laptop disk used for phase 04, fsync tails of about 1s
 stalled every commit at once and failed steps at random (`bench/results/04-horizontal/fsync`).

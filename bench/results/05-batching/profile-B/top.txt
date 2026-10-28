@@ -1,0 +1,19 @@
+86953 | 15999 | 5.435 | WITH ceiling AS ( SELECT COALESCE(min(pos) - $4, $5) AS pos FROM stream_inflight WHERE allocated_at > clock_timestamp() 
+52842 | 4439 | 11.904 | WITH input AS ( SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[
+35620 | 3839 | 9.279 | WITH input AS ( SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[
+7628 | 320010 | 0.024 | SELECT $2 FROM ONLY "public"."rooms" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+6012 | 159995 | 0.038 | SELECT id, namespace_id, name, creator_id, created_at, member_count, join_rule, direct_key, alias, expires_at FROM rooms
+4609 | 159995 | 0.029 | SELECT namespace_id, room_id, user_id, state, role, updated_at FROM room_memberships WHERE room_id = $1 AND user_id = $2
+4206 | 3653 | 1.152 | WITH ceiling AS ( SELECT COALESCE(min(pos) - $4, $5) AS pos FROM stream_inflight WHERE allocated_at > clock_timestamp() 
+2937 | 8278 | 0.355 | SELECT pg_advisory_xact_lock($1)
+2328 | 8278 | 0.281 | INSERT INTO room_seqs (room_id, last_seq) SELECT * FROM unnest($1::text[], $2::bigint[]) ON CONFLICT (room_id) DO UPDATE
+1563 | 8129 | 0.192 | SELECT s.id, s.namespace_id, s.device_id, s.user_id, s.token_hash, s.expires_at, s.created_at, d.disabled, u.disabled, n
+1365 | 8278 | 0.165 | INSERT INTO stream_inflight (pos) SELECT nextval($2) FROM generate_series($3, $1::int) RETURNING pos
+103 | 100 | 1.033 | SELECT r.id FROM rooms r JOIN room_memberships m ON m.room_id = r.id WHERE m.user_id = $1 AND m.state = $2 AND r.member_
+1 | 0 |  | NOT ok
+1 | 96 | 0.012 | SET LOCAL synchronous_commit TO $1
+0 | 1 | 0.051 | SELECT pg_stat_statements_reset()
+0 | 96 | 0.001 | COMMIT
+0 | 0 |  | SELECT round((total_exec_time + total_plan_time)::numeric) AS ms, calls, round(((total_exec_time + total_plan_time) / nu
+0 | 0 |  | $1
+0 | 96 | 0.002 | BEGIN

@@ -1,0 +1,3 @@
+sends 159992
+postgres ms per send 1.915
+events per insert batch 45.6

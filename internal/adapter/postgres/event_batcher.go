@@ -20,6 +20,9 @@ type BatchConfig struct {
 	Writes GroupLimits
 	// Reads groups concurrent /sync queries (GetVisible) into one statement.
 	Reads GroupLimits
+	// SingleTx writes each batch in one transaction holding the allocation lock until its
+	// commit (writeBatchSingleTx) instead of the two-step protocol.
+	SingleTx bool
 }
 
 // batchWriteTimeout bounds one group's database work; it serves many requests, so it can't
@@ -52,8 +55,9 @@ type createRes struct {
 // own GetVisible. Read workers run the waiting ones as one statement (getVisibleGroup).
 type batchedEventStore struct {
 	*eventStore
-	writes *groupQueue[createReq]  // nil: writes aren't grouped
-	reads  *groupQueue[visibleReq] // nil: reads aren't grouped
+	writes   *groupQueue[createReq]  // nil: writes aren't grouped
+	reads    *groupQueue[visibleReq] // nil: reads aren't grouped
+	singleTx bool
 }
 
 // NewBatchedEventStore starts the group workers. Close stops them once the groups in
@@ -62,7 +66,7 @@ func NewBatchedEventStore(pool *pgxpool.Pool, cfg BatchConfig) interface {
 	out.EventStore
 	Close()
 } {
-	s := &batchedEventStore{eventStore: &eventStore{pool: pool}}
+	s := &batchedEventStore{eventStore: &eventStore{pool: pool}, singleTx: cfg.SingleTx}
 	// An ungrouped path must keep its unbounded concurrency, not run through Workers.
 	if cfg.Writes.MaxItems > 1 {
 		s.writes = newGroupQueue(cfg.Writes, s.write)
@@ -142,15 +146,120 @@ func (s *batchedEventStore) writeOne(ctx context.Context, r createReq) {
 
 // writeBatch writes every event of batch or none. On error no caller has been answered.
 func (s *batchedEventStore) writeBatch(ctx context.Context, batch []createReq) error {
-	rooms := make([]string, len(batch))
-	for i, r := range batch {
-		rooms[i] = r.e.RoomID
+	if s.singleTx {
+		return s.writeBatchSingleTx(ctx, batch)
 	}
+	rooms := batchRooms(batch)
 	positions, seqs, err := s.allocateStreamPositions(ctx, rooms)
 	if err != nil {
 		return err
 	}
+	sql, args := insertBatchSQL(batch, positions, seqs, true)
+	rows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		s.releaseStreamPositions(ctx, positions)
+		return fmt.Errorf("postgres: insert event batch: %w", err)
+	}
+	results, err := collectBatchResults(rows, len(batch))
+	if err != nil {
+		s.releaseStreamPositions(ctx, positions)
+		return err
+	}
+	s.answer(ctx, batch, positions, seqs, results)
+	return nil
+}
 
+// writeBatchSingleTx writes a batch in one transaction that takes the allocation lock and
+// keeps it until the commit. Commits then happen in position order by construction, so the
+// batch needs no stream_inflight markers; readers still honour the markers of the
+// unbatched path, which may run alongside. The price: the lock is held through the insert
+// and its WAL flush, so batches of all instances insert one at a time.
+//
+// Two round trips, like the split path: BEGIN + lock + positions + room_seqs, then the
+// insert + COMMIT. A COMMIT after a failed insert just rolls back.
+func (s *batchedEventStore) writeBatchSingleTx(ctx context.Context, batch []createReq) error {
+	conn, err := s.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: insert event batch: %w", err)
+	}
+	// A connection left inside a transaction is closed by the pool instead of reused.
+	defer conn.Release()
+
+	rooms := batchRooms(batch)
+	uniqRooms, incs, counts := roomCounts(rooms)
+	alloc := &pgx.Batch{}
+	alloc.Queue(`BEGIN`)
+	alloc.Queue(`SELECT pg_advisory_xact_lock($1)`, streamAllocLockKey)
+	alloc.Queue(`SELECT nextval('events_stream_pos_seq') FROM generate_series(1, $1::int)`, len(rooms))
+	alloc.Queue(roomSeqsSQL, uniqRooms, incs)
+	var positions []int64
+	lastSeq := make(map[string]int64, len(uniqRooms))
+	if err := readAllocation(conn.SendBatch(ctx, alloc), &positions, lastSeq); err != nil {
+		_, _ = conn.Exec(ctx, `ROLLBACK`)
+		return fmt.Errorf("postgres: allocate stream_pos batch: %w", err)
+	}
+	slices.SortFunc(positions, cmp.Compare[int64])
+	seqs := assignRoomSeqs(rooms, counts, lastSeq)
+
+	sql, args := insertBatchSQL(batch, positions, seqs, false)
+	write := &pgx.Batch{}
+	write.Queue(sql, args...)
+	write.Queue(`COMMIT`)
+	br := conn.SendBatch(ctx, write)
+	rows, err := br.Query()
+	var results map[int64]batchOutcome
+	if err == nil {
+		results, err = collectBatchResults(rows, len(batch))
+	}
+	if err == nil {
+		_, err = br.Exec()
+	}
+	if cerr := br.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return fmt.Errorf("postgres: insert event batch: %w", err)
+	}
+	s.answer(ctx, batch, positions, seqs, results)
+	return nil
+}
+
+func readAllocation(br pgx.BatchResults, positions *[]int64, lastSeq map[string]int64) (err error) {
+	defer func() {
+		if cerr := br.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	if _, err = br.Exec(); err != nil { // BEGIN
+		return err
+	}
+	if _, err = br.Exec(); err != nil { // lock
+		return err
+	}
+	if *positions, err = collectInt64(br); err != nil {
+		return err
+	}
+	return collectRoomSeqs(br, lastSeq)
+}
+
+type batchOutcome struct {
+	inserted   bool
+	recipients []string
+}
+
+func batchRooms(batch []createReq) []string {
+	rooms := make([]string, len(batch))
+	for i, r := range batch {
+		rooms[i] = r.e.RoomID
+	}
+	return rooms
+}
+
+// insertBatchSQL is the statement of eventStore.Create over arrays: unnest keeps one row per
+// event, and the visibility rows of all small-room events come from one membership join.
+// clearInflight also deletes the batch's stream_inflight markers, asserting that none
+// expired (split path).
+func insertBatchSQL(batch []createReq, positions, seqs []int64, clearInflight bool) (string, []any) {
 	n := len(batch)
 	txnKeys, ids, roomIDs, senders, types, contents := make([]string, n), make([]string, n), make([]string, n), make([]string, n), make([]string, n), make([]string, n)
 	createdAt := make([]time.Time, n)
@@ -160,10 +269,18 @@ func (s *batchedEventStore) writeBatch(ctx context.Context, batch []createReq) e
 		txnKeys[i], ids[i], roomIDs[i], senders[i], types[i], contents[i] = e.TxnKey, e.ID, e.RoomID, e.SenderID, e.EventType, string(e.Content)
 		createdAt[i], fanOut[i] = e.CreatedAt, r.fanOut
 	}
-
-	// Same statement as eventStore.Create, over arrays: unnest keeps one row per event,
-	// and the visibility rows of all small-room events come from one membership join.
-	rows, err := s.pool.Query(ctx, `
+	inflight := `, checked AS (SELECT true AS ok)`
+	if clearInflight {
+		inflight = `, done AS (
+			DELETE FROM stream_inflight
+			WHERE pos = ANY($2) AND allocated_at > ` + inflightLiveSince(inflightWriteDeadline) + `
+			RETURNING pos
+		), checked AS (
+			SELECT nimlet_assert((SELECT count(*) FROM done) = cardinality($2::bigint[]),
+			                     'stream position allocation expired') AS ok
+		)`
+	}
+	sql := `
 		WITH input AS (
 			SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[],
 			                     $7::text[], $8::timestamptz[], $9::bool[], $10::bigint[])
@@ -187,46 +304,35 @@ func (s *batchedEventStore) writeBatch(ctx context.Context, batch []createReq) e
 			WHERE i.fan_out
 			-- No ON CONFLICT, as in eventStore.Create: duplicates are impossible.
 			RETURNING user_id, stream_pos
-		), done AS (
-			DELETE FROM stream_inflight
-			WHERE pos = ANY($2) AND allocated_at > clock_timestamp() - interval '`+inflightWriteDeadline+`'
-			RETURNING pos
-		), checked AS (
-			SELECT nimlet_assert((SELECT count(*) FROM done) = cardinality($2::bigint[]),
-			                     'stream position allocation expired') AS ok
-		)
+		)` + inflight + `
 		SELECT i.stream_pos, idem.stream_pos IS NOT NULL, v.users
 		FROM input i
 		CROSS JOIN checked
 		LEFT JOIN idem USING (stream_pos)
-		LEFT JOIN (SELECT stream_pos, array_agg(user_id) AS users FROM vis GROUP BY stream_pos) v USING (stream_pos)`,
-		txnKeys, positions, ids, roomIDs, senders, types, contents, createdAt, fanOut, seqs, time.Now().UTC(),
-	)
-	if err != nil {
-		s.releaseStreamPositions(ctx, positions)
-		return fmt.Errorf("postgres: insert event batch: %w", err)
-	}
-	type outcome struct {
-		inserted   bool
-		recipients []string
-	}
-	results := make(map[int64]outcome, n)
+		LEFT JOIN (SELECT stream_pos, array_agg(user_id) AS users FROM vis GROUP BY stream_pos) v USING (stream_pos)`
+	return sql, []any{txnKeys, positions, ids, roomIDs, senders, types, contents, createdAt, fanOut, seqs, time.Now().UTC()}
+}
+
+// collectBatchResults reads the insert's rows (one per event) and closes them.
+func collectBatchResults(rows pgx.Rows, n int) (map[int64]batchOutcome, error) {
+	defer rows.Close()
+	results := make(map[int64]batchOutcome, n)
 	for rows.Next() {
 		var pos int64
-		var o outcome
+		var o batchOutcome
 		if err := rows.Scan(&pos, &o.inserted, &o.recipients); err != nil {
-			rows.Close()
-			s.releaseStreamPositions(ctx, positions)
-			return fmt.Errorf("postgres: insert event batch: %w", err)
+			return nil, fmt.Errorf("postgres: insert event batch: %w", err)
 		}
 		results[pos] = o
 	}
 	if err := rows.Err(); err != nil || len(results) != n {
-		s.releaseStreamPositions(ctx, positions)
-		return fmt.Errorf("postgres: insert event batch: %d of %d rows: %w", len(results), n, err)
+		return nil, fmt.Errorf("postgres: insert event batch: %d of %d rows: %w", len(results), n, err)
 	}
+	return results, nil
+}
 
-	// Committed: answer every caller.
+// answer replies to every caller of a committed batch.
+func (s *batchedEventStore) answer(ctx context.Context, batch []createReq, positions, seqs []int64, results map[int64]batchOutcome) {
 	for i, r := range batch {
 		o := results[positions[i]]
 		if !o.inserted {
@@ -241,27 +347,53 @@ func (s *batchedEventStore) writeBatch(ctx context.Context, batch []createReq) e
 		}
 		r.done <- createRes{e: r.e, recipients: o.recipients}
 	}
-	return nil
 }
 
-// allocateStreamPositions is allocateStreamPos for a batch: len(rooms) positions in
-// ascending order and, per event, its room's next room_seq, in one transaction under the
-// allocation lock. Events of the same room get consecutive room_seqs in batch order, the
-// same order as their positions.
-func (s *batchedEventStore) allocateStreamPositions(ctx context.Context, rooms []string) (positions, seqs []int64, err error) {
-	// One counter update per room: ON CONFLICT can't touch a row twice in one statement.
-	counts := make(map[string]int64)
-	var uniqRooms []string
+// One counter update per room: ON CONFLICT can't touch a row twice in one statement.
+const roomSeqsSQL = `
+	INSERT INTO room_seqs (room_id, last_seq)
+	SELECT * FROM unnest($1::text[], $2::bigint[])
+	ON CONFLICT (room_id) DO UPDATE SET last_seq = room_seqs.last_seq + EXCLUDED.last_seq
+	RETURNING room_id, last_seq`
+
+// roomCounts returns the distinct rooms of a batch, in first-seen order, with the number of
+// events of each (incs, aligned with uniqRooms, and counts, by room).
+func roomCounts(rooms []string) (uniqRooms []string, incs []int64, counts map[string]int64) {
+	counts = make(map[string]int64)
 	for _, r := range rooms {
 		if counts[r] == 0 {
 			uniqRooms = append(uniqRooms, r)
 		}
 		counts[r]++
 	}
-	incs := make([]int64, len(uniqRooms))
+	incs = make([]int64, len(uniqRooms))
 	for i, r := range uniqRooms {
 		incs[i] = counts[r]
 	}
+	return uniqRooms, incs, counts
+}
+
+// assignRoomSeqs hands out each room's range of room_seqs in batch order. lastSeq is each
+// room's counter after the batch. Events of the same room get consecutive room_seqs in
+// batch order, the same order as their positions.
+func assignRoomSeqs(rooms []string, counts, lastSeq map[string]int64) []int64 {
+	next := make(map[string]int64, len(counts))
+	for r, last := range lastSeq {
+		next[r] = last - counts[r] + 1
+	}
+	seqs := make([]int64, len(rooms))
+	for i, r := range rooms {
+		seqs[i] = next[r]
+		next[r]++
+	}
+	return seqs
+}
+
+// allocateStreamPositions is allocateStreamPos for a batch: len(rooms) positions in
+// ascending order and, per event, its room's next room_seq, in one transaction under the
+// allocation lock.
+func (s *batchedEventStore) allocateStreamPositions(ctx context.Context, rooms []string) (positions, seqs []int64, err error) {
+	uniqRooms, incs, counts := roomCounts(rooms)
 
 	batch := &pgx.Batch{}
 	batch.Queue(`BEGIN`)
@@ -272,11 +404,7 @@ func (s *batchedEventStore) allocateStreamPositions(ctx context.Context, rooms [
 	batch.Queue(`INSERT INTO stream_inflight (pos)
 		SELECT nextval('events_stream_pos_seq') FROM generate_series(1, $1::int)
 		RETURNING pos`, len(rooms))
-	batch.Queue(`
-		INSERT INTO room_seqs (room_id, last_seq)
-		SELECT * FROM unnest($1::text[], $2::bigint[])
-		ON CONFLICT (room_id) DO UPDATE SET last_seq = room_seqs.last_seq + EXCLUDED.last_seq
-		RETURNING room_id, last_seq`, uniqRooms, incs)
+	batch.Queue(roomSeqsSQL, uniqRooms, incs)
 	batch.Queue(`COMMIT`)
 
 	lastSeq := make(map[string]int64, len(uniqRooms))
@@ -297,18 +425,7 @@ func (s *batchedEventStore) allocateStreamPositions(ctx context.Context, rooms [
 		}
 	}
 	slices.SortFunc(positions, cmp.Compare[int64])
-
-	// lastSeq is each room's counter after the batch; hand out its range in batch order.
-	next := make(map[string]int64, len(uniqRooms))
-	for r, last := range lastSeq {
-		next[r] = last - counts[r] + 1
-	}
-	seqs = make([]int64, len(rooms))
-	for i, r := range rooms {
-		seqs[i] = next[r]
-		next[r]++
-	}
-	return positions, seqs, nil
+	return positions, assignRoomSeqs(rooms, counts, lastSeq), nil
 }
 
 func collectInt64(br pgx.BatchResults) ([]int64, error) {

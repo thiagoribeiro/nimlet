@@ -18,6 +18,7 @@ import (
 	"github.com/thiagoribeiro/nimlet/internal/adapter/postgres"
 	"github.com/thiagoribeiro/nimlet/internal/app"
 	"github.com/thiagoribeiro/nimlet/internal/domain"
+	"github.com/thiagoribeiro/nimlet/internal/port/out"
 	"github.com/thiagoribeiro/nimlet/testkit"
 )
 
@@ -305,25 +306,118 @@ func TestEnsureEventPartitions(t *testing.T) {
 	assert.Zero(t, again, "idempotent")
 }
 
+// batchModes runs a test against both write protocols of the batched store.
+func batchModes(t *testing.T, run func(t *testing.T, singleTx bool)) {
+	for _, single := range []bool{false, true} {
+		name := "split"
+		if single {
+			name = "single"
+		}
+		t.Run(name, func(t *testing.T) { run(t, single) })
+	}
+}
+
 // The batched store must honour the whole event store contract; MaxWait makes the
 // contract's concurrent sends and reads actually share groups.
 func TestBatchedEventStore_Contract(t *testing.T) {
-	pool := testPool(t)
-	store := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
-		Writes: postgres.GroupLimits{MaxItems: 16, MaxWait: 2 * time.Millisecond, Workers: 2},
-		Reads:  postgres.GroupLimits{MaxItems: 16, MaxWait: 2 * time.Millisecond, Workers: 2},
+	batchModes(t, func(t *testing.T, single bool) {
+		pool := testPool(t)
+		store := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
+			Writes:   postgres.GroupLimits{MaxItems: 16, MaxWait: 2 * time.Millisecond, Workers: 2},
+			Reads:    postgres.GroupLimits{MaxItems: 16, MaxWait: 2 * time.Millisecond, Workers: 2},
+			SingleTx: single,
+		})
+		t.Cleanup(store.Close)
+		testkit.RunEventStoreContract(t, store, pool)
 	})
-	t.Cleanup(store.Close)
-	testkit.RunEventStoreContract(t, store, pool)
+}
+
+// Single-transaction batches commit without stream_inflight markers, while unbatched sends
+// still use them. A reader tailing the stream with its cursor must never see a position
+// before a lower one has become visible: it would skip that one for good.
+func TestBatchedEventStore_MixedWritersKeepOrder(t *testing.T) {
+	pool := testPool(t)
+	plain := postgres.NewEventStore(pool)
+	batched := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
+		Writes:   postgres.GroupLimits{MaxItems: 16, MaxWait: time.Millisecond, Workers: 4},
+		SingleTx: true,
+	})
+	t.Cleanup(batched.Close)
+	ctx := context.Background()
+
+	user, room := uuid.NewString(), uuid.NewString()
+	testkit.SeedUser(pool, user)
+	testkit.SeedRoom(pool, room, user)
+	testkit.SeedMembership(pool, room, user, "join")
+	device := uuid.NewString()
+	start, err := plain.CurrentStreamPos(ctx)
+	require.NoError(t, err)
+
+	const writers, perWriter = 8, 40
+	var wg sync.WaitGroup
+	for w := range writers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var store out.EventStore = batched
+			if w%2 == 0 {
+				store = plain
+			}
+			for i := range perWriter {
+				e := &domain.Event{
+					ID: uuid.NewString(), RoomID: room, SenderID: user, EventType: "m.room.message",
+					Content: []byte(`{"body":"x"}`), TxnKey: fmt.Sprintf("%s:%d-%d", device, w, i), CreatedAt: time.Now().UTC(),
+				}
+				_, _, err := store.Create(ctx, e, true)
+				assert.NoError(t, err)
+			}
+		}()
+	}
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+
+	var seen []int64
+	since := start
+	tail := func() {
+		events, err := plain.GetVisible(ctx, user, since, 100)
+		require.NoError(t, err)
+		for _, e := range events {
+			seen = append(seen, e.StreamPos)
+			since = e.StreamPos
+		}
+	}
+	for running := true; running; {
+		select {
+		case <-done:
+			running = false
+		default:
+		}
+		tail()
+	}
+	tail()
+
+	all, err := plain.GetVisible(ctx, user, start, writers*perWriter+10)
+	require.NoError(t, err)
+	require.Len(t, all, writers*perWriter)
+	want := make([]int64, len(all))
+	for i, e := range all {
+		want[i] = e.StreamPos
+	}
+	assert.Equal(t, want, seen, "the tailing reader skipped or reordered positions")
 }
 
 // A batch mixing good sends, a send to a missing room and a txn_key repeated within the
 // batch: the bad send fails alone, the repeat returns the original, the rest commit with
 // consecutive room_seqs.
 func TestBatchedEventStore_IsolatesFailures(t *testing.T) {
+	batchModes(t, testBatchIsolatesFailures)
+}
+
+func testBatchIsolatesFailures(t *testing.T, single bool) {
 	pool := testPool(t)
 	store := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
-		Writes: postgres.GroupLimits{MaxItems: 64, MaxWait: 20 * time.Millisecond, Workers: 1},
+		Writes:   postgres.GroupLimits{MaxItems: 64, MaxWait: 20 * time.Millisecond, Workers: 1, WaitAlways: true},
+		SingleTx: single,
 	})
 	t.Cleanup(store.Close)
 	ctx := context.Background()

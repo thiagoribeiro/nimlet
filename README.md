@@ -902,12 +902,13 @@ All configuration is via environment variables.
 | `NIMLET_AUTO_MIGRATE` | `true` | Apply pending migrations at server startup; set `false` when the server's DB role has no DDL rights |
 | `NIMLET_PROFILE` | `large` | Instance size preset for the variables below: `small` (≤0.5 CPU), `medium` (1-2 CPUs), `large` (2+ CPUs); see [Sizing](#sizing) |
 | `NIMLET_DB_MAX_CONNS` | profile (`small` 12, `medium` 16, `large` `max(50, NumCPU×4)`) | Max DB pool connections per instance |
-| `NIMLET_EVENT_BATCH_MAX` | `64` | Sends written per transaction (group commit); `1` disables batching |
+| `NIMLET_EVENT_BATCH_MAX` | `100` | Sends written per transaction (group commit); `1` disables batching |
 | `NIMLET_EVENT_BATCH_WORKERS` | profile (1 / 1 / 4) | Send batches in flight per instance |
-| `NIMLET_EVENT_BATCH_WAIT_US` | profile (2000 / 1000 / 0) | µs a send batch waits for more sends after its first |
+| `NIMLET_EVENT_BATCH_WAIT_US` | `20000` | µs a send batch waits for more sends after its first. Only when the previous batch had more than one send: a send on an idle instance never waits |
+| `NIMLET_EVENT_BATCH_MODE` | `split` | `split`: positions are allocated in a short transaction and the batch is inserted in a second one. `single`: one transaction holds the allocation lock until its commit. Measured slower (inserts serialise across the cluster); kept for experiments, see phase 05 in `docs/benchmarks.md` |
 | `NIMLET_SYNC_READ_MAX` | `64` | Concurrent `/sync` queries run as one statement; `1` disables grouping |
 | `NIMLET_SYNC_READ_WORKERS` | profile (1 / 1 / 8) | `/sync` query groups in flight per instance |
-| `NIMLET_SYNC_READ_WAIT_US` | profile (2000 / 1000 / 0) | µs a query group waits for more queries after its first |
+| `NIMLET_SYNC_READ_WAIT_US` | profile (2000 / 1000 / 0) | µs a query group waits for more queries after its first, only when the previous group had more than one |
 | `NIMLET_AUTH_HMAC_SECRET` | *(required, ≥32 chars)* | Secret for HMAC token signing |
 | `NIMLET_AUTH_CACHE_TTL_MS` | `1000` | How long an instance reuses a session lookup; revocations and disables reach other instances within this time (`0` disables the cache) |
 | `NIMLET_REDIS_ADDR` | `localhost:6379` | Redis address |
@@ -935,14 +936,18 @@ Pick `NIMLET_PROFILE` by the CPU each instance gets. Any variable set explicitly
 
 | Profile | Per instance | Why |
 |---|---|---|
-| `small` | ≤0.5 CPU, many instances | Each instance sees little concurrent load, so it waits up to 2ms to fill write batches and `/sync` query groups, and keeps 1 worker each and 12 connections. More workers or connections only add Postgres planning and contention. |
+| `small` | ≤0.5 CPU, many instances | Each instance sees little concurrent load, so it waits up to 2ms to fill `/sync` query groups, and keeps 1 worker each and 12 connections. More workers or connections only add Postgres planning and contention. |
 | `medium` | 1-2 CPUs | Same shape, with 1ms waits and 16 connections. |
-| `large` | 2+ CPUs, few instances | Enough concurrent load to fill groups without waiting; needs the parallelism (4 write and 8 read workers). |
+| `large` | 2+ CPUs, few instances | Enough concurrent load to fill query groups without waiting; needs the parallelism (4 write and 8 read workers). |
+
+Send batches are the same on every profile: up to 100 sends, waiting up to 20ms for more, but
+only while the instance is under load (the previous batch had more than one send). An idle
+instance writes each send at once.
 
 Postgres 18 is recommended: `/sync` touches every `events` / `event_visibility` partition, more
 locks than the 16 fast-path slots of earlier versions, and the shared lock manager then becomes
 the bottleneck. On 18, set `max_locks_per_transaction=256` (it also sizes the fast-path slots).
-Measurements behind these values: [`docs/benchmarks.md`](docs/benchmarks.md), phase 04.
+Measurements behind these values: [`docs/benchmarks.md`](docs/benchmarks.md), phases 04 and 05.
 
 ### Metrics
 
@@ -1034,7 +1039,8 @@ PostgreSQL is always the source of truth. Redis improves latency, not correctnes
   50k deliveries/s at delivery p99 under 500ms.
 - **Scaling out on the same 2 cores:** splitting them into 1 → 8 instances of 0.25 CPU raises
   capacity 10.7× for sync-heavy load (150 → 1600 msg/s) and 3.1× for send-heavy load
-  (1600 → 5000 msg/s). The ceiling is then the shared Postgres (96–99% CPU).
+  (1600 → 5000 msg/s). The ceiling is then the shared Postgres (96–99% CPU). Phase 05's
+  bigger send batches raise send-heavy capacity to 6000 msg/s on the same 8 instances.
 - **Changes and failures:** adding and removing instances, `kill -9` of an instance, and
   restarting Redis or Postgres under load lost, duplicated or reordered nothing, across 78M
   checked deliveries. Sends are retried with the same txnId.

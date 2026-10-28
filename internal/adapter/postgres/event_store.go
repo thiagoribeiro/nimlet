@@ -33,16 +33,26 @@ const (
 	inflightAbandonAfter = "30 seconds"
 )
 
+// inflightLiveSince is the oldest allocated_at of a marker that may still commit, given
+// how long writers have. Markers from before the Postgres server started are dead too:
+// their transactions were cut by the restart, and their writers could no longer release
+// them. Without this, a restart under load froze every reader for inflightAbandonAfter
+// (UNLOGGED tables survive a clean shutdown). Writers check the same bound, so a marker
+// a reader ignores can never commit afterwards.
+func inflightLiveSince(window string) string {
+	return `greatest(clock_timestamp() - interval '` + window + `', pg_postmaster_start_time())`
+}
+
 // largeRoomThresholdSQL inlines domain.LargeRoomThreshold into queries as a literal so the
 // planner can use the partial index idx_rooms_large (WHERE member_count >= 1000).
 var largeRoomThresholdSQL = strconv.Itoa(domain.LargeRoomThreshold)
 
 // readCeilingCTE yields the highest stream_pos a reader may return or advance its cursor to:
 // just below the lowest live in-flight allocation. Evaluated in the reader's own snapshot.
-const readCeilingCTE = `ceiling AS (
+var readCeilingCTE = `ceiling AS (
 		SELECT COALESCE(min(pos) - 1, 9223372036854775807) AS pos
 		FROM stream_inflight
-		WHERE allocated_at > clock_timestamp() - interval '` + inflightAbandonAfter + `')`
+		WHERE allocated_at > ` + inflightLiveSince(inflightAbandonAfter) + `)`
 
 // Create inserts an event, its idempotency record and its visibility rows.
 //
@@ -92,7 +102,7 @@ func (s *eventStore) Create(ctx context.Context, e *domain.Event, fanOut bool) (
 			RETURNING user_id
 		), done AS (
 			DELETE FROM stream_inflight
-			WHERE pos = $2 AND allocated_at > clock_timestamp() - interval '`+inflightWriteDeadline+`'
+			WHERE pos = $2 AND allocated_at > `+inflightLiveSince(inflightWriteDeadline)+`
 			RETURNING pos
 		)
 		SELECT nimlet_assert(EXISTS (SELECT 1 FROM done), 'stream position allocation expired'),
@@ -167,12 +177,13 @@ func (s *eventStore) releaseStreamPos(ctx context.Context, pos int64) {
 	}
 }
 
-// SweepStreamInflight deletes in-flight markers abandoned by crashed writers. Readers
+// SweepStreamInflight deletes in-flight markers abandoned by crashed writers or cut by a
+// Postgres restart. Readers
 // already ignore them; this only keeps the table small.
 func SweepStreamInflight(ctx context.Context, pool *pgxpool.Pool) (int64, error) {
 	tag, err := pool.Exec(ctx, `
 		DELETE FROM stream_inflight
-		WHERE allocated_at < clock_timestamp() - interval '`+inflightAbandonAfter+`'`)
+		WHERE allocated_at <= `+inflightLiveSince(inflightAbandonAfter))
 	if err != nil {
 		return 0, fmt.Errorf("postgres: sweep stream_inflight: %w", err)
 	}

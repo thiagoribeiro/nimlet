@@ -1,0 +1,20 @@
+77439 | 11709 | 6.614 | WITH ceiling AS ( SELECT COALESCE(min(pos) - $4, $5) AS pos FROM stream_inflight WHERE allocated_at > clock_timestamp() 
+62579 | 9571 | 6.538 | WITH input AS ( SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[
+46824 | 7954 | 5.887 | WITH input AS ( SELECT * FROM unnest($1::text[], $2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[
+11688 | 18431 | 0.634 | SELECT pg_advisory_xact_lock($1)
+9489 | 320010 | 0.030 | SELECT $2 FROM ONLY "public"."rooms" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+6410 | 159995 | 0.040 | SELECT id, namespace_id, name, creator_id, created_at, member_count, join_rule, direct_key, alias, expires_at FROM rooms
+6208 | 6589 | 0.942 | WITH ceiling AS ( SELECT COALESCE(min(pos) - $4, $5) AS pos FROM stream_inflight WHERE allocated_at > clock_timestamp() 
+4944 | 159995 | 0.031 | SELECT namespace_id, room_id, user_id, state, role, updated_at FROM room_memberships WHERE room_id = $1 AND user_id = $2
+3835 | 17525 | 0.219 | INSERT INTO room_seqs (room_id, last_seq) SELECT * FROM unnest($1::text[], $2::bigint[]) ON CONFLICT (room_id) DO UPDATE
+2167 | 17525 | 0.124 | INSERT INTO stream_inflight (pos) SELECT nextval($2) FROM generate_series($3, $1::int) RETURNING pos
+1582 | 8124 | 0.195 | SELECT s.id, s.namespace_id, s.device_id, s.user_id, s.token_hash, s.expires_at, s.created_at, d.disabled, u.disabled, n
+637 | 529 | 1.203 | WITH idem AS ( INSERT INTO event_idempotency (txn_key, stream_pos, event_id, created_at) VALUES ($1, $2, $3, $4) ON CONF
+386 | 377 | 1.023 | WITH idem AS ( INSERT INTO event_idempotency (txn_key, stream_pos, event_id, created_at) VALUES ($1, $2, $3, $4) ON CONF
+92 | 906 | 0.102 | INSERT INTO room_seqs (room_id, last_seq) VALUES ($1, $2) ON CONFLICT (room_id) DO UPDATE SET last_seq = room_seqs.last_
+60 | 906 | 0.066 | INSERT INTO stream_inflight (pos) VALUES (nextval($1)) RETURNING pos
+58 | 100 | 0.578 | SELECT r.id FROM rooms r JOIN room_memberships m ON m.room_id = r.id WHERE m.user_id = $1 AND m.state = $2 AND r.member_
+2 | 0 |  | NOT ok
+1 | 96 | 0.012 | SET LOCAL synchronous_commit TO $1
+0 | 0 |  | $1
+0 | 0 |  | SELECT round((total_exec_time + total_plan_time)::numeric) AS ms, calls, round(((total_exec_time + total_plan_time) / nu

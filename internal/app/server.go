@@ -153,8 +153,9 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 	if cfg.DB.EventBatchMax > 1 || cfg.DB.SyncReadMax > 1 {
 		us := func(n int) time.Duration { return time.Duration(n) * time.Microsecond }
 		batched := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
-			Writes: postgres.GroupLimits{MaxItems: cfg.DB.EventBatchMax, MaxWait: us(cfg.DB.EventBatchWaitUs), Workers: cfg.DB.EventBatchWorkers},
-			Reads:  postgres.GroupLimits{MaxItems: cfg.DB.SyncReadMax, MaxWait: us(cfg.DB.SyncReadWaitUs), Workers: cfg.DB.SyncReadWorkers},
+			Writes:   postgres.GroupLimits{MaxItems: cfg.DB.EventBatchMax, MaxWait: us(cfg.DB.EventBatchWaitUs), Workers: cfg.DB.EventBatchWorkers},
+			Reads:    postgres.GroupLimits{MaxItems: cfg.DB.SyncReadMax, MaxWait: us(cfg.DB.SyncReadWaitUs), Workers: cfg.DB.SyncReadWorkers},
+			SingleTx: cfg.DB.EventBatchSingleTx,
 		})
 		// Deferred, so it runs after the HTTP server's graceful shutdown below: in-flight
 		// sends are written before the workers stop.

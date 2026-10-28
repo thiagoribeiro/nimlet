@@ -1,0 +1,64 @@
+setup: 200 users in 20 rooms ready in 0s
+listening: 20 listeners caught up in 44ms
+warmup: 10s at 200/s
+
+step 1: target=200/s achieved=199.9/s acked=3999 failed=0 retries=0 shed=0 delivered=3999/3999 (100.00%) PASS
+  send        n=3999    p50=880µs      p95=1.31ms     p99=2.25ms     max=18.45ms
+  delivery    n=3999    p50=12.05ms    p95=12.92ms    p99=14.57ms    max=29.46ms
+
+step 2: target=400/s achieved=399.9/s acked=7999 failed=0 retries=0 shed=0 delivered=7999/7999 (100.00%) PASS
+  send        n=7999    p50=960µs      p95=4.08ms     p99=6.35ms     max=27.48ms
+  delivery    n=7999    p50=12.27ms    p95=15.68ms    p99=17.92ms    max=40.58ms
+
+step 3: target=600/s achieved=600.0/s acked=11999 failed=0 retries=0 shed=0 delivered=11999/11999 (100.00%) PASS
+  send        n=11999   p50=1.07ms     p95=4.84ms     p99=13.35ms    max=43.5ms
+  delivery    n=11999   p50=12.47ms    p95=16.48ms    p99=27.01ms    max=57.4ms
+
+step 4: target=800/s achieved=800.0/s acked=15999 failed=0 retries=0 shed=0 delivered=15999/15999 (100.00%) PASS
+  send        n=15999   p50=2.16ms     p95=23.11ms    p99=26.32ms    max=54.11ms
+  delivery    n=15999   p50=13.6ms     p95=35.12ms    p99=38.92ms    max=67.73ms
+
+step 5: target=1000/s achieved=1000.0/s acked=19999 failed=0 retries=0 shed=0 delivered=19999/19999 (100.00%) PASS
+  send        n=19999   p50=4.57ms     p95=24.86ms    p99=28.05ms    max=66.88ms
+  delivery    n=19999   p50=15.72ms    p95=36.18ms    p99=41ms       max=83.32ms
+
+step 6: target=1300/s achieved=1300.0/s acked=25999 failed=0 retries=0 shed=0 delivered=25999/25999 (100.00%) PASS
+  send        n=25999   p50=15.56ms    p95=27.93ms    p99=32.63ms    max=86.85ms
+  delivery    n=25999   p50=25.29ms    p95=41.02ms    p99=47.75ms    max=99.64ms
+
+step 7: target=1600/s achieved=1600.0/s acked=31999 failed=0 retries=0 shed=0 delivered=31999/31999 (100.00%) PASS
+  send        n=31999   p50=19.19ms    p95=31.82ms    p99=42.16ms    max=101.84ms
+  delivery    n=31999   p50=28.35ms    p95=46.7ms     p99=59.2ms     max=109.99ms
+
+step 8: target=2000/s achieved=2000.0/s acked=39999 failed=0 retries=0 shed=0 delivered=39999/39999 (100.00%) PASS
+  send        n=39999   p50=21.07ms    p95=35.44ms    p99=46.6ms     max=113.36ms
+  delivery    n=39999   p50=30.76ms    p95=50.99ms    p99=63.15ms    max=144.34ms
+
+step 9: target=2500/s achieved=2499.9/s acked=49999 failed=0 retries=0 shed=0 delivered=49999/49999 (100.00%) PASS
+  send        n=49999   p50=24.82ms    p95=44.39ms    p99=63.17ms    max=127.41ms
+  delivery    n=49999   p50=36.3ms     p95=63.24ms    p99=83.34ms    max=147.06ms
+
+step 10: target=3000/s achieved=2999.9/s acked=59999 failed=0 retries=0 shed=0 delivered=59999/59999 (100.00%) PASS
+  send        n=59999   p50=30.5ms     p95=56.36ms    p99=78.99ms    max=137.38ms
+  delivery    n=59999   p50=42.78ms    p95=74.24ms    p99=98.22ms    max=164.48ms
+
+step 11: target=4000/s achieved=3999.9/s acked=79999 failed=0 retries=0 shed=0 delivered=79999/79999 (100.00%) PASS
+  send        n=79999   p50=39.63ms    p95=77.14ms    p99=114.74ms   max=212.78ms
+  delivery    n=79999   p50=54.95ms    p95=99.59ms    p99=140.08ms   max=246.95ms
+
+step 12: target=5000/s achieved=4999.9/s acked=99999 failed=0 retries=0 shed=0 delivered=99999/99999 (100.00%) PASS
+  send        n=99999   p50=60.16ms    p95=133.22ms   p99=183.66ms   max=294.27ms
+  delivery    n=99999   p50=84.25ms    p95=168.54ms   p99=221.2ms    max=387.57ms
+
+step 13: target=6000/s achieved=5999.9/s acked=119999 failed=0 retries=0 shed=0 delivered=119999/119999 (100.00%) PASS
+  send        n=119999  p50=68.09ms    p95=181.48ms   p99=242.19ms   max=451.48ms
+  delivery    n=119999  p50=101.42ms   p95=226.48ms   p99=298.67ms   max=552.59ms
+
+scenario: members=200 rooms=20 listeners=20 senders=200 steps=[200 400 600 800 1000 1300 1600 2000 2500 3000 4000 5000 6000] duration=20s
+capacity: 6000 msg/s (highest passing step, slo delivery p99 < 500ms)
+sends: attempted=569986 acked=569986 failed=0
+deliveries: expected=569986 live=569986 late=0 lost=0 (0.0000%) unacked-delivered=0
+integrity: redelivered=0 double-insert=0 reordered=0
+sync: calls=214775 errors=0 reconnects=0
+reconnect     n=0
+initial sync  n=20      p50=38.13ms    p95=43.69ms    p99=43.69ms    max=43.69ms

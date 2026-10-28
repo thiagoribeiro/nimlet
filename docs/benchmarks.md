@@ -528,3 +528,50 @@ is the split protocol moved out of Postgres. Its allocation share is ~7–10% of
 this profile, which bounds the gain. In exchange Redis would become the source of truth for
 ordering, with new failure modes: a crash between the Postgres commit and the Redis update, epoch
 fencing when Redis restarts, and keeping `room_seq` atomic with the position. Not pursued.
+
+## 06 — presence (`bench/results/06-presence`)
+
+Branch `perf/presence`. Phase 05's baseline came in ~20% below phase 04 on sync-heavy load,
+although send-heavy matched. The cause was the change "end presence seconds after a sync
+returns" (#3), merged between the two phases. Each `/sync` made two synchronous Redis round
+trips:
+- `SET` before registering its waiter;
+- `PEXPIRE` in a `defer`, before the response was written.
+
+Before #3, a user's key was written at most every 30s. Sync-heavy load is bound by instance
+CPU, so the round trips showed up directly in the numbers. At the same 1300 msg/s on 8 small
+instances, phase 05 served ~12k `/sync`/s against phase 04's ~17k, which is +46µs of instance
+CPU per `/sync`.
+
+**Change (`perf(presence)`).** `Begin` and `End` return at once, and one loop per instance
+pipelines their net effect to Redis:
+- `Begin` writes only when the key would expire too soon for the long-poll. For an active
+  client that is about once every 5s.
+- `End` is held for 1s and dropped if the user's next `/sync` begins meanwhile.
+- Open `/sync`s are counted per user and instance.
+
+Lateness only costs redundant pushes (the `PresenceStore` contract). A user who leaves becomes
+absent ~11s later instead of 10s.
+
+Same protocol as phases 04 and 05: Postgres in `/dev/shm`, three repetitions, median (min–max).
+`before` is the phase-05 head (`bench/batching`); its `sizes` numbers are variant E of phase 05.
+
+| Sync-heavy, N × 0.25 CPU | Phase 04 | before | after |
+|---:|---:|---:|---:|
+| 1 | 150 | 100 | 150 (100–150) |
+| 2 | 300 | 200 | 300 |
+| 4 | 1300 (1000–1300) | 500 (500–600) | 1000 |
+| 8 | 1600 | 1000 (1000–1300) | 1600 (800–1600) |
+
+| Profile | Phase 04 | before (05-E) | after |
+|---|---:|---:|---:|
+| `small` 8 × 0.25 | 1600 | 1300 (1000–1300) | 1600 (1300–1600) |
+| `medium` 2 × 1 | 2500 (2500–3000) | 3000 (2500–3000) | 3000 |
+| `large` 1 × 2 | 2500 | 2500 (1300–2500) | 2500 |
+
+**What the change bought:**
+- At 1300 msg/s on 8 small instances, `/sync`/s went back to ~17.4k, with delivery p99
+  394–452ms.
+- Sync-heavy scaling is 10.7× from 1 to 8 instances again (before: 10×, from a lower base).
+- Phase 05's bigger send batches now add to phase 04's numbers: `medium` reaches 3000 msg/s.
+- 0 lost, duplicated or reordered in every run.

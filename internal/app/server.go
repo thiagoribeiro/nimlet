@@ -185,7 +185,7 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 	// presenceStore backs both /sync (marks a user as actively connected) and push
 	// delivery (skips anyone who is). pushDispatcher stays a no-op unless a Firebase
 	// service-account key is configured.
-	presenceStore := redis.NewPresenceStore(redisClient)
+	presenceStore := redis.NewPresenceWriter(redisClient)
 	pushQueue := redis.NewPushQueue(redisClient)
 
 	pushDispatcher, err := newPushDispatcher(ctx, cfg, pushQueue, presenceStore, deviceStore, namespaceStore, userStore)
@@ -262,6 +262,8 @@ func RunServer(ctx context.Context, cfg *appcfg.Config) error {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown error", "error", err)
 	}
+	// After the last /sync returned: their presence ends now instead of at the key's TTL.
+	presenceStore.Close()
 
 	slog.Info("server stopped")
 	return nil

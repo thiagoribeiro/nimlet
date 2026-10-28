@@ -1,0 +1,10 @@
+time="2026-10-28T08:00:03-03:00" level=error msg="User-selected graph driver \"overlay\" overwritten by graph driver \"vfs\" from database - delete libpod local files (\"/home/thiago/.local/share/containers/storage\") to resolve.  May prevent use of images created by other tools"
+stored events for this run, and lg_n stored more than once (must be 0):
+ stored | distinct_sends | duplicates 
+--------+----------------+------------
+ 261990 |         261990 |          0
+
+examples of duplicated sends (empty is good):
+ lg_n | copies | event_ids 
+------+--------+-----------
+

@@ -902,13 +902,13 @@ All configuration is via environment variables.
 | `NIMLET_AUTO_MIGRATE` | `true` | Apply pending migrations at server startup; set `false` when the server's DB role has no DDL rights |
 | `NIMLET_PROFILE` | `large` | Instance size preset for the variables below: `small` (≤0.5 CPU), `medium` (1-2 CPUs), `large` (2+ CPUs); see [Sizing](#sizing) |
 | `NIMLET_DB_MAX_CONNS` | profile (`small` 12, `medium` 16, `large` `max(50, NumCPU×4)`) | Max DB pool connections per instance |
-| `NIMLET_EVENT_BATCH_MAX` | `64` | Sends written per transaction (group commit); `1` disables batching |
+| `NIMLET_EVENT_BATCH_MAX` | `100` | Sends written per transaction (group commit); `1` disables batching |
 | `NIMLET_EVENT_BATCH_WORKERS` | profile (1 / 1 / 4) | Send batches in flight per instance |
-| `NIMLET_EVENT_BATCH_WAIT_US` | profile (2000 / 1000 / 0) | µs a send batch waits for more sends after its first |
-| `NIMLET_EVENT_BATCH_MODE` | `split` | `split`: positions are allocated in a short transaction and the batch is inserted in a second one. `single`: one transaction holds the allocation lock until its commit (phase 05 in `docs/benchmarks.md`) |
+| `NIMLET_EVENT_BATCH_WAIT_US` | `20000` | µs a send batch waits for more sends after its first. Only when the previous batch had more than one send: a send on an idle instance never waits |
+| `NIMLET_EVENT_BATCH_MODE` | `split` | `split`: positions are allocated in a short transaction and the batch is inserted in a second one. `single`: one transaction holds the allocation lock until its commit. Measured slower (inserts serialise across the cluster); kept for experiments, see phase 05 in `docs/benchmarks.md` |
 | `NIMLET_SYNC_READ_MAX` | `64` | Concurrent `/sync` queries run as one statement; `1` disables grouping |
 | `NIMLET_SYNC_READ_WORKERS` | profile (1 / 1 / 8) | `/sync` query groups in flight per instance |
-| `NIMLET_SYNC_READ_WAIT_US` | profile (2000 / 1000 / 0) | µs a query group waits for more queries after its first |
+| `NIMLET_SYNC_READ_WAIT_US` | profile (2000 / 1000 / 0) | µs a query group waits for more queries after its first, only when the previous group had more than one |
 | `NIMLET_AUTH_HMAC_SECRET` | *(required, ≥32 chars)* | Secret for HMAC token signing |
 | `NIMLET_AUTH_CACHE_TTL_MS` | `1000` | How long an instance reuses a session lookup; revocations and disables reach other instances within this time (`0` disables the cache) |
 | `NIMLET_REDIS_ADDR` | `localhost:6379` | Redis address |

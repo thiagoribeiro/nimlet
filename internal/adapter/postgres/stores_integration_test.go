@@ -416,7 +416,7 @@ func TestBatchedEventStore_IsolatesFailures(t *testing.T) {
 func testBatchIsolatesFailures(t *testing.T, single bool) {
 	pool := testPool(t)
 	store := postgres.NewBatchedEventStore(pool, postgres.BatchConfig{
-		Writes:   postgres.GroupLimits{MaxItems: 64, MaxWait: 20 * time.Millisecond, Workers: 1},
+		Writes:   postgres.GroupLimits{MaxItems: 64, MaxWait: 20 * time.Millisecond, Workers: 1, WaitAlways: true},
 		SingleTx: single,
 	})
 	t.Cleanup(store.Close)

@@ -1,0 +1,46 @@
+{
+  "capacity": 200,
+  "errors": null,
+  "listeners": 8000,
+  "members": 16000,
+  "reconnect_max_ms": 0,
+  "reconnect_p99_ms": 0,
+  "reconnects": 0,
+  "reliability": {
+    "attempted": 13998,
+    "acked": 13998,
+    "failed": 0,
+    "expected": 139980,
+    "delivered_live": 139980,
+    "delivered_late": 0,
+    "lost": 0,
+    "unacked_delivered": 0,
+    "redelivered": 0,
+    "double_insert": 0,
+    "reorders": 0
+  },
+  "rooms": 800,
+  "run": "dmhathls2q6b",
+  "senders": 800,
+  "slo_ms": 500,
+  "step_duration_s": 60,
+  "steps": [
+    {
+      "rate": 200,
+      "achieved": 199.98333333333332,
+      "acked": 11999,
+      "failed": 0,
+      "retries": 0,
+      "shed": 0,
+      "delivered": 119990,
+      "expected": 119990,
+      "send_p50_ms": 1.219,
+      "send_p99_ms": 6.971,
+      "delivery_p50_ms": 13.109,
+      "delivery_p99_ms": 20.956,
+      "pass": true
+    }
+  ],
+  "sync_calls": 139980,
+  "sync_errors": 0
+}

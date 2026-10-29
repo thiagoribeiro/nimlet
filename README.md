@@ -952,8 +952,9 @@ instance writes each send at once.
 Postgres 18 is recommended: `/sync` touches every `events` / `event_visibility` partition, more
 locks than the 16 fast-path slots of earlier versions, and the shared lock manager then becomes
 the bottleneck. On 18, set `max_locks_per_transaction=256` (it also sizes the fast-path slots).
-**Memory.** An instance needs about 55 MB plus 90 KB per open `/sync` long-poll (2100
-long-polls: ~240 MB). Leave ~1.5× headroom for load above capacity. Each Postgres connection
+**Memory.** An instance needs about 70 MB plus 70 KB per open `/sync` long-poll (8000
+long-polls: ~620 MB). Leave ~1.5× headroom for load above capacity: after a peak, memory
+comes back down only over minutes, as the GC runs (set `GOMEMLIMIT` under a tight limit). Each Postgres connection
 adds ~5 MB on top of `shared_buffers`.
 
 Measurements behind these values: [`docs/benchmarks.md`](docs/benchmarks.md), phases 04, 05 and 07.

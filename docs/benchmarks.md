@@ -597,13 +597,51 @@ with the run's peak alongside. 0 lost or reordered in every run.
 | `large` 1 × 2 (2500 msg/s) | ~2100 | 293 MB | 242 MB | 157 MB | ~6200 | 411 MB |
 
 - **Memory follows open long-polls, not the message rate.** The three points fit
-  **~55 MB + ~90 KB per connection** of process memory (anon). Extrapolating, which these runs
-  didn't measure: ~1 GB for 10k long-polls on one instance.
+  ~55 MB + ~90 KB per connection of process memory (anon). The ramp below, with more points,
+  refines that to **~70 MB + ~70 KB**.
 - **Cluster totals:** 8 `small` instances use ~630 MB, 2 `medium` ~400 MB and 1 `large`
   ~290 MB. Each extra process adds its fixed share.
 - **The `large` peak (411 MB, 10k goroutines) is queueing,** not growth: it comes in the step
   above capacity, where requests pile up. Runs of ~3 minutes can't rule out a slow leak; that
   takes a long run at constant load.
+
+### Concurrent long-polls (`bench/results/07-memory-syncramp`)
+
+`bench/syncramp.sh` holds one `large` instance (no quota) at 1k, 2k, 4k, 8k and 16k open
+long-polls, then 4k and 1k again. Each step is a 60s loadgen run, followed by 20s idle.
+16k users sit in 800 rooms of 20, and 200 msg/s are spread over every room, so each listener
+wakes every few seconds. `bench/syncramp_report.py` builds the table; values are means over
+each run's measured seconds. 0 lost, duplicated or reordered in every run.
+
+| Long-polls | Instance anon | Go heap in use | goroutines | HAProxy | loadgen RSS | delivery p50 / p99 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 (start) | 104 MB | 94 MB | 1 051 | 17 MB | – | |
+| 1 000 | 129 MB | 85 MB | 3 053 | 33 MB | 71 MB | 12 / 14 ms |
+| 2 000 | 216 MB | 133 MB | 5 282 | 75 MB | 128 MB | 12 / 14 ms |
+| 4 000 | 348 MB | 210 MB | 9 563 | 116 MB | 242 MB | 12 / 15 ms |
+| 8 000 | 617 MB | 364 MB | 17 732 | 190 MB | 494 MB | 13 / 19 ms |
+| 16 000 | 808 MB (peak 888) | 508 MB | 26 258 | 488 MB | 1 GB | 2 023 / 3 440 ms |
+| 4 000 (down) | 495 MB | 260 MB | 9 055 | 394 MB | 254 MB | 12 / 15 ms |
+| 1 000 (down) | 473 MB | 201 MB | 4 056 | 308 MB | 69 MB | 12 / 14 ms |
+
+- **Per long-poll,** fitted over the way up (1k–8k): **~70 KB anon**, of which ~40 KB is
+  heap. The rest is the stacks of ~2 goroutines per connection and GC headroom. HAProxy adds
+  ~22 KB per connection, the loadgen ~62 KB.
+- **8k long-polls on one instance:** ~620 MB, delivery p99 19 ms.
+- **16k saturated:** the initial catch-up took 19.5s, deliveries were seconds late, and only
+  ~26k goroutines were up where ~34k were expected, so part of the polls were queued. CPU
+  wasn't sampled in this run, so it is open whether the instance, HAProxy (one core) or the
+  loadgen (two cores) was the limit. Not a ceiling of the instance.
+- **The ~1050 goroutines at rest** are the 256 Redis Pub/Sub partitions, 4 goroutines each.
+  They are fixed per instance.
+- **Memory isn't given back right after a peak, but it isn't leaked.** On the way down the heap
+  stayed at 170–200 MB, against 85 MB at the start. A rerun with pprof (8k long-polls, then 90s
+  idle) shows what held it: ~86 MB of `net/http`'s per-connection `bufio` buffers, parked in
+  its `sync.Pool`. A pool empties only after two GC cycles, and with little traffic the GC
+  rarely runs. After three forced GCs, the heap was back to 87 MB. What remained above the start
+  was ~20 MB: pgx statement caches of the pool's new connections, the session cache and the
+  `ttlCache`, all bounded. The process' anon memory follows as the runtime returns pages to the
+  OS, over minutes. Set `GOMEMLIMIT` when the container limit is tight.
 
 ### Postgres and the rest
 
@@ -619,6 +657,7 @@ The Postgres cgroup reads ~2.4 GB, almost all of it the data dir that `PG_RAM` k
 `/dev/shm`. That memory is charged to Postgres as shmem but is not Postgres' working memory.
 `shared_buffers` stayed at the image's 128 MB (`PG_TUNE` off).
 
-**Sizing.** For an instance's memory limit, budget ~55 MB plus ~90 KB per long-poll it serves,
-with roughly 1.5× headroom for load above capacity. For Postgres, budget ~5 MB per
+**Sizing.** For an instance's memory limit, budget ~70 MB plus ~70 KB per long-poll it serves
+(8k long-polls: ~620 MB). Add roughly 1.5× headroom for load above capacity and for the
+memory a peak leaves behind. For Postgres, budget ~5 MB per
 connection on top of `shared_buffers`.

@@ -78,7 +78,9 @@ milliseconds per send from `pg_stat_statements`.
 
 Memory: run `bench/memsample.sh mem.csv &` next to any of them and kill it afterwards.
 `python3 bench/memreport.py mem.csv bench/results/<name>` turns a `sizes` run into the
-phase-07 tables.
+phase-07 tables. `bench/syncramp.sh <name>` holds one instance at a growing number of open
+long-polls (`RAMP`, default up to 16k and back) with the sampler running, and
+`python3 bench/syncramp_report.py bench/results/<name>` builds its table.
 
 `horizontal.sh` sets `PG_RAM=1`, which keeps the Postgres data directory in `/dev/shm`. Commits
 still fsync, but at memory speed. On the laptop disk used for phase 04, fsync tails of about 1s

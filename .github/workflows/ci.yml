@@ -2,7 +2,9 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore: ['site/**', 'docs/landing.md', '.github/workflows/pages.yml', '.github/scripts/**']
   pull_request:
+    paths-ignore: ['site/**', 'docs/landing.md', '.github/workflows/pages.yml', '.github/scripts/**']
 jobs:
   unit:
     runs-on: ubuntu-latest

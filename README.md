@@ -8,7 +8,7 @@ Nimlet is a **lightweight, self-hosted, HTTP-first messaging backend** for conne
 
 Build the experience your product needs. Let Nimlet handle the communication.
 
-[Quick start](#quick-start) · [API overview](#api-overview) · [AppServices](#appservices) · [Benchmarks](docs/benchmarks.md) · [Operations](docs/operations.md)
+[Website](https://thiagoribeiro.github.io/nimlet/) · [Quick start](#quick-start) · [API overview](#api-overview) · [AppServices](#appservices) · [Benchmarks](docs/benchmarks.md) · [Operations](docs/operations.md)
 
 ---
 
@@ -80,7 +80,7 @@ Nimlet deliberately doesn't run agents, call models, or interpret your applicati
 
 ## Deliberately focused infrastructure
 
-Nimlet is implemented as a Go server with **PostgreSQL as the source of truth**. For a single instance, Redis is not required for correctness or local wake-ups; multiple instances can use Redis Pub/Sub to lower notification latency. Media can be stored locally or in S3-compatible storage.
+Nimlet is implemented as a Go server with **PostgreSQL as the source of truth**. Redis is required at startup and carries wake-ups (Pub/Sub), presence and the push queue, but it never stores events: if a wake-up is lost, clients fall back to their long-poll timeout and re-sync from PostgreSQL. Media can be stored locally or in S3-compatible storage.
 
 This is a **small product scope**, not a claim that infrastructure has zero cost or that Nimlet outperforms every alternative. PostgreSQL still needs to be deployed and operated. Reproducible [benchmarks](docs/benchmarks.md) document performance and engineering trade-offs; comparative end-to-end memory and hosting-cost results are not yet established.
 

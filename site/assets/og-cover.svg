@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#071916"/><stop offset="1" stop-color="#12392B"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#63BA82" stop-opacity=".33"/><stop offset="1" stop-color="#63BA82" stop-opacity="0"/></radialGradient>
+    <pattern id="dots" patternUnits="userSpaceOnUse" width="24" height="24"><circle cx="1" cy="1" r="1" fill="#82DCA3" opacity=".14"/></pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+  <circle cx="980" cy="270" r="430" fill="url(#glow)"/>
+  <path d="M760 380c105 0 105-245 240-245s115 245 200 245" stroke="#A7F6BC" stroke-width="31" stroke-linecap="round" fill="none" opacity=".17"/>
+  <circle cx="1190" cy="380" r="39" fill="#A7F6BC" opacity=".17"/>
+  <rect x="76" y="67" width="66" height="66" rx="15" fill="#164331" stroke="#3A9061"/>
+  <path d="M87 110c9 0 11-24 25-24s14 24 22 24" stroke="#A7F6BC" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <circle cx="135" cy="110" r="6" fill="#A7F6BC"/>
+  <text x="163" y="115" fill="#F5FFF4" font-family="DejaVu Sans,Arial,sans-serif" font-size="45" font-weight="bold" letter-spacing="-2">nimlet</text>
+  <circle cx="302" cy="108" r="5" fill="#A7F6BC"/>
+  <text x="75" y="270" fill="#F8FFF4" font-family="DejaVu Sans,Arial,sans-serif" font-size="77" font-weight="bold" letter-spacing="-4">Messaging made</text>
+  <text x="75" y="359" fill="#A7F6BC" font-family="DejaVu Sans,Arial,sans-serif" font-size="85" font-weight="bold" letter-spacing="-5">simple.</text>
+  <text x="79" y="439" fill="#BBD0C1" font-family="DejaVu Sans,Arial,sans-serif" font-size="25">Your application needs messaging.</text>
+  <text x="79" y="477" fill="#BBD0C1" font-family="DejaVu Sans,Arial,sans-serif" font-size="25">Not a messaging platform.</text>
+  <rect x="75" y="551" width="1045" height="1" fill="#406C54"/>
+  <text x="75" y="588" fill="#9FDDB6" font-family="DejaVu Sans Mono,monospace" font-size="18" letter-spacing="1">OPEN SOURCE  /  SELF-HOSTED  /  HTTP-FIRST</text>
+</svg>

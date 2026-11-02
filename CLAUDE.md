@@ -185,5 +185,9 @@ the default (`max(50, NumCPU*4)`) assumes a single instance.
 
 ## Repo housekeeping
 
+`site/` is the static landing page (https://thiagoribeiro.github.io/nimlet/), deployed by
+`.github/workflows/pages.yml` on pushes to `main`; see `docs/landing.md`. Keep its claims in
+sync with README.md (e.g. Redis is required, benchmark figures).
+
 `READMEmd` at the repo root is a stray duplicate of `README.md` (identical content, no dot) — not a
 real doc, don't treat it as a separate source of truth.

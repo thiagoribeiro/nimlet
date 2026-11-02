@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071916">
+  <meta name="description" content="Open-source, self-hosted messaging backend in Go. HTTP API for chat, devices and AI agents: rooms, persistent events, idempotent sends and sync.">
+  <meta name="author" content="Thiago Ribeiro">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://thiagoribeiro.github.io/nimlet/">
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="preload" as="image" href="./assets/nimlet-mark.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Nimlet">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="Nimlet — Messaging made simple.">
+  <meta property="og:description" content="Your application needs messaging. Not a messaging platform. Open-source, self-hosted, HTTP-first communication infrastructure.">
+  <meta property="og:url" content="https://thiagoribeiro.github.io/nimlet/">
+  <meta property="og:image" content="https://thiagoribeiro.github.io/nimlet/assets/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Nimlet. Messaging made simple. Your application needs messaging, not a messaging platform.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Nimlet — Messaging made simple.">
+  <meta name="twitter:description" content="A focused, self-hosted communication backend for apps, devices and AI agents.">
+  <meta name="twitter:image" content="https://thiagoribeiro.github.io/nimlet/assets/og-cover.png">
+  <meta name="twitter:image:alt" content="Nimlet. Messaging made simple. Your application needs messaging, not a messaging platform.">
+  <title>Nimlet — Self-hosted messaging backend for apps, devices &amp; AI agents</title>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Nimlet","description":"Open-source, self-hosted, HTTP-first messaging backend in Go for apps, devices and AI agents.","codeRepository":"https://github.com/thiagoribeiro/nimlet","programmingLanguage":"Go","runtimePlatform":"Go","applicationCategory":"DeveloperApplication","keywords":"self-hosted messaging backend, chat backend, HTTP API, long polling, PostgreSQL, Go, AI agents","author":{"@type":"Person","name":"Thiago Ribeiro","url":"https://github.com/thiagoribeiro"},"license":"https://www.apache.org/licenses/LICENSE-2.0","url":"https://thiagoribeiro.github.io/nimlet/"}</script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header" id="top">
+      <div class="container header-inner">
+        <a class="brand" href="#top" aria-label="Nimlet, back to top">
+          <img src="./assets/nimlet-mark.svg" width="37" height="37" alt="" aria-hidden="true">
+          <span>nimlet<span class="brand-stop">.</span></span>
+        </a>
+        <nav class="desktop-nav" aria-label="Main navigation">
+          <a href="#why">Why Nimlet</a>
+          <a href="#use-cases">Use cases</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#benchmarks">Benchmarks</a>
+        </nav>
+        <div class="header-actions">
+          <a class="github-link" href="https://github.com/thiagoribeiro/nimlet" target="_blank" rel="noopener noreferrer" aria-label="Nimlet on GitHub, opens in a new tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .9a11.1 11.1 0 0 0-3.51 21.63c.56.1.76-.24.76-.54v-2.08c-3.1.68-3.75-1.3-3.75-1.3-.5-1.28-1.23-1.62-1.23-1.62-1.01-.69.08-.68.08-.68 1.12.08 1.71 1.15 1.71 1.15.99 1.69 2.59 1.2 3.22.91.1-.72.39-1.2.71-1.48-2.48-.28-5.09-1.24-5.09-5.5 0-1.22.44-2.21 1.15-2.99-.12-.28-.5-1.42.11-2.95 0 0 .94-.3 3.05 1.14a10.65 10.65 0 0 1 5.55 0c2.12-1.44 3.05-1.14 3.05-1.14.61 1.53.23 2.67.11 2.95.72.78 1.15 1.77 1.15 2.99 0 4.27-2.61 5.21-5.1 5.49.4.35.76 1.02.76 2.06v3.06c0 .3.2.65.77.54A11.1 11.1 0 0 0 12 .9Z"/></svg>
+            <span>GitHub</span>
+          </a>
+          <a class="header-cta" href="#quickstart">Get started <span aria-hidden="true">↗</span></a>
+          <button class="menu-toggle" id="menu-toggle" type="button" aria-controls="mobile-navigation" aria-expanded="false" aria-label="Open navigation menu">
+            <span></span><span></span><span></span>
+          </button>
+        </div>
+      </div>
+      <nav class="mobile-navigation" id="mobile-navigation" aria-label="Mobile navigation" hidden>
+        <a href="#why">Why Nimlet</a>
+        <a href="#use-cases">Use cases</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#benchmarks">Benchmarks</a>
+        <a href="#quickstart">Get started</a>
+        <a href="https://github.com/thiagoribeiro/nimlet" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main id="main">
+    <div class="dark-opening">
+      <section class="hero container" aria-labelledby="hero-heading">
+        <div class="hero-copy">
+          <div class="eyebrow eyebrow-mint"><span class="eyebrow-dot"></span> OPEN SOURCE <span class="eyebrow-separator">/</span> HTTP-FIRST <span class="eyebrow-separator">/</span> SELF-HOSTED</div>
+          <h1 id="hero-heading">Messaging<br>made <em>simple.</em></h1>
+          <p class="hero-deck">Your application needs messaging.<br><strong>Not a messaging platform.</strong></p>
+          <p class="hero-description">An open-source messaging backend written in Go. Connect people, applications, devices and AI agents over the Internet. Build the experience your product needs. Let Nimlet handle the communication.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#quickstart">Start building <span class="arrow-icon" aria-hidden="true">↗</span></a>
+            <a class="button button-outline" href="https://github.com/thiagoribeiro/nimlet" target="_blank" rel="noopener noreferrer">Explore the source <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="hero-facts" aria-label="Project characteristics">
+            <span><span class="fact-mark"></span> No mandatory WebSockets</span>
+            <span><span class="fact-mark"></span> Apache 2.0</span>
+          </div>
+        </div>
+        <div class="hero-visual" role="img" aria-label="Diagram showing a web application, AI agent and connected device communicating through Nimlet, with PostgreSQL as the source of truth and Redis for wake-ups and presence">
+          <div class="hero-visual-header"><span class="mono">// A SMALL COMMUNICATION CORE</span><span class="stage-status"><i></i> ONLINE</span></div>
+          <div class="flow-chart">
+            <div class="flow-sources">
+              <div class="source-node"><span class="node-glyph">▣</span><span>Web app</span><span class="node-indicator"></span></div>
+              <div class="source-node"><span class="node-glyph">✳</span><span>AI agent</span><span class="node-indicator"></span></div>
+              <div class="source-node"><span class="node-glyph">⌁</span><span>Device</span><span class="node-indicator"></span></div>
+            </div>
+            <div class="flow-lines flow-lines-in" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="flow-core">
+              <div class="core-logo"><img src="./assets/nimlet-mark.svg" width="56" height="56" alt=""></div>
+              <div class="core-title">NIMLET</div>
+              <div class="core-subtitle">HTTP API</div>
+              <div class="core-blink"></div>
+            </div>
+            <div class="flow-lines flow-lines-out" aria-hidden="true"><span></span></div>
+            <div class="flow-stores">
+              <div class="store-node store-primary"><span class="store-symbol">▤</span><strong>PostgreSQL</strong><small>Source of truth</small></div>
+              <div class="store-node store-secondary"><span class="store-symbol">◌</span><strong>Redis</strong><small>Wake-ups &amp; presence</small></div>
+            </div>
+          </div>
+          <div class="hero-visual-footer"><span><b>AUTH</b> · ROOMS · EVENTS · SYNC</span><span class="mono">HTTPS <span class="pulse-arrow">→</span></span></div>
+        </div>
+        <div class="hero-edge-label" aria-hidden="true">THE COMMUNICATION LAYER, NOT THE WHOLE PLATFORM.</div>
+      </section>
+    <div class="hero-bottom-line"><div class="container"><span>FOCUSED INFRASTRUCTURE</span><span>01 — 06</span><span>SCROLL TO EXPLORE <span aria-hidden="true">↓</span></span></div></div>
+  </div>
+
+  <div class="section-light">
+    <section class="why section-pad container" id="why" aria-labelledby="why-heading">
+      <div class="section-marker"><span>01 / THE IDEA</span><span>LESS TO BUILD. LESS TO OPERATE.</span></div>
+      <div class="why-layout">
+        <div class="why-intro">
+          <h2 id="why-heading">Your feature is messaging.<br><span class="ink-muted">Your product is something else.</span></h2>
+          <p>Chats, commands, notifications, agent conversations: different experiences, familiar infrastructure problems.</p>
+          <p>Nimlet gives you the essential communication layer. Your application owns the interface, the workflows and what events mean.</p>
+          <a class="text-link" href="https://github.com/thiagoribeiro/nimlet#why-nimlet" target="_blank" rel="noopener noreferrer">Read the design rationale <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="problems" aria-label="The recurring messaging problems Nimlet addresses">
+          <div class="problem"><span class="problem-num">01</span><div><h3>Who can talk to whom?</h3><p>Authenticated identities, memberships and room-level permissions.</p></div></div>
+          <div class="problem"><span class="problem-num">02</span><div><h3>What if the connection drops?</h3><p>Persisted events and a sync cursor to catch up after reconnecting.</p></div></div>
+          <div class="problem"><span class="problem-num">03</span><div><h3>What happens on retry?</h3><p>Idempotent event sends, so a repeated request doesn't add duplicates.</p></div></div>
+          <div class="problem"><span class="problem-num">04</span><div><h3>How do other systems join in?</h3><p>HTTP APIs and AppServices for bots, integrations and external agents.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="use-cases section-pad container" id="use-cases" aria-labelledby="use-cases-heading">
+      <div class="section-marker"><span>02 / USE CASES</span><span>ONE SMALL CORE, MANY APPLICATIONS.</span></div>
+      <div class="section-heading-row">
+        <h2 id="use-cases-heading">Built to fit <em>your</em> use case.</h2>
+        <p>Messaging is a building block, not a prescription for the kind of product you should build.</p>
+      </div>
+      <div class="use-grid">
+        <article class="use-card use-card-one">
+          <div class="use-card-top"><span>01 / APPLICATIONS</span><span class="use-icon" aria-hidden="true">▣</span></div>
+          <div class="use-card-illustration use-illustration-chat" aria-hidden="true"><div class="chat-preview"><div class="chat-line chat-line-a"></div><div class="chat-line chat-line-b"></div><div class="chat-line chat-line-c"></div><div class="chat-compose"></div></div><span class="tiny-label">YOUR UI</span></div>
+          <div class="use-card-bottom"><h3>Embedded chat</h3><p>Add conversations to your app without adopting an entire chat product.</p></div>
+        </article>
+        <article class="use-card use-card-two">
+          <div class="use-card-top"><span>02 / INTELLIGENCE</span><span class="use-icon" aria-hidden="true">✳</span></div>
+          <div class="use-card-illustration use-illustration-agent" aria-hidden="true"><span class="ai-terminal">user <b>→</b> agent</span><div class="agent-spark"><span>✳</span></div><span class="ai-terminal">agent <b>→</b> user</span></div>
+          <div class="use-card-bottom"><h3>AI applications</h3><p>Give external agents a persistent, authenticated conversation channel.</p></div>
+        </article>
+        <article class="use-card use-card-three">
+          <div class="use-card-top"><span>03 / CONNECTED THINGS</span><span class="use-icon" aria-hidden="true">⌁</span></div>
+          <div class="use-card-illustration use-illustration-device" aria-hidden="true"><div class="device-frame"><div class="device-screen"><i></i><i></i><i></i></div></div><div class="device-waves"><span></span><span></span><span></span></div><span class="tiny-label">ACROSS NETWORKS</span></div>
+          <div class="use-card-bottom"><h3>Connected devices</h3><p>Exchange commands and responses across the Internet, with offline catch-up.</p></div>
+        </article>
+        <article class="use-card use-card-four">
+          <div class="use-card-top"><span>04 / EXTENSIBILITY</span><span class="use-icon" aria-hidden="true">↗</span></div>
+          <div class="use-card-illustration use-illustration-services" aria-hidden="true"><div class="service-diagram"><span>APP</span><b>↔</b><span>NIMLET</span><b>↔</b><span>BOT</span></div><span class="tiny-label">APP SERVICES</span></div>
+          <div class="use-card-bottom"><h3>Service integrations</h3><p>Bridge bots and external systems through focused HTTP interfaces.</p></div>
+        </article>
+      </div>
+      <p class="use-grid-note">Different products can also share one Nimlet deployment using namespaces, with data and authorization isolation.</p>
+    </section>
+
+    <section class="features section-pad container" id="features" aria-labelledby="features-heading">
+      <div class="section-marker"><span>03 / CAPABILITIES</span><span>THE ESSENTIALS, DONE IN ONE PLACE.</span></div>
+      <div class="section-heading-row feature-heading"><h2 id="features-heading">A small surface area.<br><em>Real capabilities.</em></h2><p>Intentionally scoped to communication concerns, without taking over your application.</p></div>
+      <div class="feature-grid">
+        <div class="feature-cell"><div class="feature-top"><span class="feature-icon">◎</span><span class="feature-number">01</span></div><h3>Identity &amp; permissions</h3><p>Users, devices, sessions, memberships and room roles.</p></div>
+        <div class="feature-cell"><div class="feature-top"><span class="feature-icon">▤</span><span class="feature-number">02</span></div><h3>Persistent events</h3><p>Append-only room events with paginated history in PostgreSQL.</p></div>
+        <div class="feature-cell"><div class="feature-top"><span class="feature-icon">↺</span><span class="feature-number">03</span></div><h3>Recoverable sync</h3><p>Incremental HTTP long polling and opaque catch-up cursors.</p></div>
+        <div class="feature-cell"><div class="feature-top"><span class="feature-icon">≡</span><span class="feature-number">04</span></div><h3>Safe retries</h3><p>Idempotent sends using per-device transaction IDs.</p></div>
+        <div class="feature-cell"><div class="feature-top"><span class="feature-icon">⇄</span><span class="feature-number">05</span></div><h3>Extensible by design</h3><p>AppServices connect external participants, bots and bridges.</p></div>
+        <div class="feature-cell"><div class="feature-top"><span class="feature-icon">◇</span><span class="feature-number">06</span></div><h3>Self-hosted &amp; isolated</h3><p>Infrastructure you control, with independent application namespaces.</p></div>
+      </div>
+      <div class="features-boundary"><span class="boundary-asterisk">✳</span><p><strong>Purposefully not a general-purpose broker, a full collaboration suite or an agent framework.</strong> Nimlet handles events and communication. Your app handles meaning and behavior.</p><a href="https://github.com/thiagoribeiro/nimlet#what-nimlet-is-not" target="_blank" rel="noopener noreferrer">See the boundaries ↗</a></div>
+    </section>
+  </div>
+
+  <div class="section-dark">
+    <section class="architecture section-pad container" id="architecture" aria-labelledby="architecture-heading">
+      <div class="section-marker section-marker-dark"><span>04 / ARCHITECTURE</span><span>HTTP AT THE EDGE. DURABILITY AT THE CORE.</span></div>
+      <div class="architecture-heading"><h2 id="architecture-heading">Straightforward to build on.<br><em>Clear about its boundaries.</em></h2><p>No mandatory WebSockets. No client-facing broker. No framework deciding what your application's events should mean.</p></div>
+      <div class="architecture-board" role="img" aria-label="Architecture: web applications, mobile apps, devices and agent services communicate via HTTP over TLS with Nimlet. Nimlet persists events in PostgreSQL, the source of truth. Redis carries wake-ups and presence but stores no events. Media storage is optional.">
+        <div class="arch-inputs"><div><span class="arch-input-symbol">▣</span> Web</div><div><span class="arch-input-symbol">▯</span> Mobile</div><div><span class="arch-input-symbol">⌁</span> Devices</div><div><span class="arch-input-symbol">✳</span> Agents</div></div>
+        <div class="arch-connection"><span class="connection-label">HTTPS / HTTP APIs</span><span class="arch-line"></span><span class="arch-tip">▼</span></div>
+        <div class="arch-nimlet"><div class="arch-nimlet-heading"><img src="./assets/nimlet-mark.svg" width="39" height="39" alt=""><strong>NIMLET</strong><span>Communication backend</span></div><div class="arch-chips"><span>Identity</span><span>Rooms</span><span>Events</span><span>Sync</span><span>AppServices</span></div></div>
+        <div class="arch-branch"><span></span><span></span><span></span></div>
+        <div class="arch-outputs"><div class="arch-output"><span class="arch-output-icon">▤</span><h3>PostgreSQL</h3><p>Persistent source of truth</p><small>REQUIRED</small></div><div class="arch-output"><span class="arch-output-icon">◌</span><h3>Redis</h3><p>Wake-ups &amp; presence</p><small>REQUIRED · NOT A SOURCE OF TRUTH</small></div><div class="arch-output"><span class="arch-output-icon">▧</span><h3>Media storage</h3><p>Local filesystem or S3</p><small>OPTIONAL</small></div></div>
+        <div class="arch-board-foot"><span><i></i> PostgreSQL provides consistency</span><span><i></i> Redis accelerates wake-ups</span><span><i></i> Sync cursors enable recovery</span></div>
+      </div>
+      <div class="architecture-footnote"><p>Redis does not store the authoritative event stream. AppService HTTP callbacks are best-effort; integrations requiring durable processing can consume persisted events with <code>/sync</code> and track their progress.</p><a class="text-link text-link-light" href="https://github.com/thiagoribeiro/nimlet#architecture" target="_blank" rel="noopener noreferrer">Explore the architecture <span aria-hidden="true">↗</span></a></div>
+    </section>
+
+    <section class="demo section-pad container" id="demo" aria-labelledby="demo-heading">
+      <div class="section-marker section-marker-dark"><span>05 / INTERACTIVE EXPLAINER</span><span>RECOVERY, NOT JUST DELIVERY.</span></div>
+      <div class="demo-layout">
+        <div class="demo-copy"><h2 id="demo-heading">A connection can disappear.<br><em>The conversation shouldn't.</em></h2><p>Persist an event, disconnect a client, then reconnect. Nimlet's HTTP sync model lets the client catch up from a cursor instead of depending on a permanently open connection.</p><p class="demo-disclaimer"><span class="status-bullet"></span> Local illustration only — this is a simulated interaction, not a live Nimlet server.</p><div class="demo-instructions">Try: <strong>Go offline</strong> → <strong>Publish event</strong> → <strong>Reconnect &amp; sync</strong>.</div></div>
+        <div class="demo-panel" aria-label="Interactive demonstration of event persistence and reconnection">
+          <div class="demo-panel-top"><span class="mono">// SIMULATED EVENT STREAM</span><span class="demo-connection" id="demo-connection"><i></i><span>CONNECTED</span></span></div>
+          <div class="demo-body">
+            <div class="demo-events-head"><span>ROOM / general</span><span id="demo-cursor">cursor: 40</span></div>
+            <div class="demo-event-list" id="demo-event-list" role="log" aria-live="polite" aria-relevant="additions text">
+              <div class="demo-event demo-event-initial"><span class="event-seq">#40</span><span>Connected. Waiting for events.</span><span class="event-check">✓</span></div>
+            </div>
+            <div class="demo-queue" id="demo-queue" aria-live="polite"><span>SERVER STREAM</span><span id="demo-queue-label">All events synchronized</span></div>
+          </div>
+          <div class="demo-controls"><button type="button" class="demo-button demo-button-outline" id="demo-toggle">Go offline</button><button type="button" class="demo-button demo-button-publish" id="demo-publish">Publish event <span aria-hidden="true">↗</span></button><button type="button" class="demo-reset" id="demo-reset" aria-label="Reset simulation" title="Reset simulation">↺</button></div>
+          <div class="demo-panel-foot">Events are kept on the simulated server while the client is offline.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="section-mint">
+    <section class="benchmarks section-pad container" id="benchmarks" aria-labelledby="benchmarks-heading">
+      <div class="section-marker"><span>06 / EVIDENCE</span><span>MEASURED. REPRODUCIBLE. CONTEXT INCLUDED.</span></div>
+      <div class="benchmark-top"><h2 id="benchmarks-heading">Small scope.<br><em>Measured throughput.</em></h2><div class="benchmark-intro"><p>Performance figures are useful when you can see the workload behind them. These results come from the documented phase-04 sync-heavy benchmark — not a universal capacity guarantee.</p><a class="text-link" href="https://github.com/thiagoribeiro/nimlet/blob/main/docs/benchmarks.md#04--horizontal-benchresults04-horizontal" target="_blank" rel="noopener noreferrer">See full methodology <span aria-hidden="true">↗</span></a></div></div>
+      <div class="benchmark-stats"><div class="benchmark-stat"><div class="benchmark-number">2,500<span> msg/s</span></div><div class="benchmark-caption"><strong>Messages published per second</strong><p>One Nimlet instance, a documented sync-heavy workload with 20-member rooms.</p></div></div><div class="benchmark-stat"><div class="benchmark-number">50,000<span> /s</span></div><div class="benchmark-caption"><strong>Derived event deliveries per second</strong><p>2,500 messages × 20 room members, in the same benchmark scenario.</p></div></div></div>
+      <div class="benchmark-method"><span class="method-icon">ⓘ</span><p><strong>Test context:</strong> One Linux laptop; Nimlet on two CPU cores, PostgreSQL on three; local workload generation and storage in RAM for this phase. Reported at a delivery p99 below 500 ms. Real-world throughput depends on infrastructure and traffic patterns.</p></div>
+    </section>
+  </div>
+
+  <div class="section-last">
+    <section class="quickstart section-pad container" id="quickstart" aria-labelledby="quickstart-heading">
+      <div class="section-marker section-marker-dark"><span>GET STARTED / BUILD SOMETHING</span><span>YOUR APPLICATION. YOUR INFRASTRUCTURE.</span></div>
+      <div class="quickstart-layout">
+        <div class="quickstart-copy"><h2 id="quickstart-heading">Less plumbing.<br><em>More building.</em></h2><p>Run Nimlet alongside PostgreSQL and Redis, register a user, create a room, and send your first event. Start with the documented quick start; work directly with HTTP.</p><div class="quickstart-actions"><a class="button button-primary" href="https://github.com/thiagoribeiro/nimlet#quick-start" target="_blank" rel="noopener noreferrer">Full quick start <span aria-hidden="true">↗</span></a><a class="button button-outline" href="https://github.com/thiagoribeiro/nimlet/blob/main/openapi.yaml" target="_blank" rel="noopener noreferrer">Browse the API <span aria-hidden="true">↗</span></a></div></div>
+        <div class="code-window"><div class="code-top"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><div class="code-tabs" role="tablist" aria-label="HTTP examples"><button type="button" role="tab" id="tab-send" aria-selected="true" aria-controls="panel-send" tabindex="0" data-code-tab="send">Send an event</button><button type="button" role="tab" id="tab-sync" aria-selected="false" aria-controls="panel-sync" tabindex="-1" data-code-tab="sync">Sync events</button></div><button type="button" class="copy-code" id="copy-code" aria-label="Copy code example" title="Copy code example"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span>Copy</span></button></div>
+          <div id="panel-send" role="tabpanel" aria-labelledby="tab-send"><pre><code><span class="code-comment"># After registering and creating a room</span>
+<span class="code-command">curl</span> -X PUT \
+  <span class="code-string">"http://localhost:8080/rooms/$ROOM/send/m.room.message/txn1"</span> \
+  -H <span class="code-string">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="code-string">"Content-Type: application/json"</span> \
+  -d <span class="code-string">'{"msgtype":"m.text","body":"hello"}'</span></code></pre></div>
+          <div id="panel-sync" role="tabpanel" aria-labelledby="tab-sync" hidden><pre><code><span class="code-comment"># Catch up on new events using HTTP long polling</span>
+<span class="code-command">curl</span> <span class="code-string">"http://localhost:8080/sync?timeout=30000"</span> \
+  -H <span class="code-string">"Authorization: Bearer $TOKEN"</span>
+
+<span class="code-comment"># Next request: pass the returned next_batch</span>
+<span class="code-comment"># cursor as the `since` query parameter.</span></code></pre></div>
+          <div class="code-bottom"><span><i></i> HTTP-FIRST API</span><span>Go + PostgreSQL</span></div></div>
+      </div>
+      <div class="resource-links"><a href="https://github.com/thiagoribeiro/nimlet/blob/main/docs/operations.md" target="_blank" rel="noopener noreferrer"><span>OPERATIONS GUIDE</span> <span aria-hidden="true">↗</span></a><a href="https://github.com/thiagoribeiro/nimlet/blob/main/examples/chat.html" target="_blank" rel="noopener noreferrer"><span>EXAMPLE CHAT</span> <span aria-hidden="true">↗</span></a><a href="https://github.com/thiagoribeiro/nimlet/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer"><span>CONTRIBUTE</span> <span aria-hidden="true">↗</span></a></div>
+    </section>
+    <footer class="site-footer container"><div class="footer-main"><div><a class="footer-brand" href="#top"><img src="./assets/nimlet-mark.svg" width="40" height="40" alt=""><span>nimlet<span>.</span></span></a><p>Messaging made simple.<br>Built to be part of your product, not the whole product.</p></div><div class="footer-links"><div><h3>PROJECT</h3><a href="https://github.com/thiagoribeiro/nimlet" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="https://github.com/thiagoribeiro/nimlet#quick-start" target="_blank" rel="noopener noreferrer">Quick start ↗</a><a href="https://github.com/thiagoribeiro/nimlet/blob/main/docs/benchmarks.md" target="_blank" rel="noopener noreferrer">Benchmarks ↗</a></div><div><h3>COMMUNITY</h3><a href="https://github.com/thiagoribeiro/nimlet/issues" target="_blank" rel="noopener noreferrer">Issues ↗</a><a href="https://github.com/thiagoribeiro/nimlet/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contributing ↗</a><a href="https://github.com/thiagoribeiro/nimlet/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Security ↗</a></div></div></div><div class="footer-bottom"><span>© <span id="year">2026</span> Nimlet contributors · Apache License 2.0</span><span>Early-stage software. APIs may change before a stable release.</span><a href="#top">BACK TO TOP ↑</a></div></footer>
+  </div>
+    </main>
+  <div class="sr-only" id="announcer" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

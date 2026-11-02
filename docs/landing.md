@@ -37,7 +37,8 @@ pushes to `main` that touch it (or via manual dispatch). Pages' source must be s
 - Canonical URL, `og:url`, `og:image` and `sitemap.xml` point to
   `https://thiagoribeiro.github.io/nimlet/`; update them all if a custom domain is added, and
   bump `<lastmod>` in `sitemap.xml` on content changes.
-- `robots.txt` only works at the host root, so it lives in the `thiagoribeiro.github.io`
-  repository, which lists this sitemap.
+- There is no `robots.txt`: crawlers only read it at the host root (`thiagoribeiro.github.io`,
+  not served today), and without one everything is allowed. The sitemap is submitted through
+  Google Search Console instead.
 - `site/googled3a93fd256d1471a.html` verifies the Google Search Console property for
   `https://thiagoribeiro.github.io/nimlet/`. Don't remove it, or the property loses verification.

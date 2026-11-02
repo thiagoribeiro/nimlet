@@ -39,3 +39,5 @@ pushes to `main` that touch it (or via manual dispatch). Pages' source must be s
   bump `<lastmod>` in `sitemap.xml` on content changes.
 - `robots.txt` only works at the host root, so it lives in the `thiagoribeiro.github.io`
   repository, which lists this sitemap.
+- `site/googled3a93fd256d1471a.html` verifies the Google Search Console property for
+  `https://thiagoribeiro.github.io/nimlet/`. Don't remove it, or the property loses verification.

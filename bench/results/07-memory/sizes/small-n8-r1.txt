@@ -1,0 +1,32 @@
+setup: 2000 users in 100 rooms ready in 1ms
+listening: 2000 listeners caught up in 514ms
+warmup: 10s at 600/s
+
+step 1: target=600/s achieved=600.0/s acked=11999 failed=0 retries=0 shed=0 delivered=239980/239980 (100.00%) PASS
+  send        n=11999   p50=20.24ms    p95=73.44ms    p99=121.29ms   max=226.56ms
+  delivery    n=239980  p50=44.52ms    p95=115.21ms   p99=163.11ms   max=288.54ms
+
+step 2: target=800/s achieved=800.0/s acked=15999 failed=0 retries=0 shed=0 delivered=319980/319980 (100.00%) PASS
+  send        n=15999   p50=52.03ms    p95=151.92ms   p99=216.19ms   max=415.7ms
+  delivery    n=319980  p50=97.2ms     p95=217.65ms   p99=287.22ms   max=519.55ms
+
+step 3: target=1000/s achieved=1000.0/s acked=19999 failed=0 retries=0 shed=0 delivered=399980/399980 (100.00%) PASS
+  send        n=19999   p50=94.84ms    p95=224.39ms   p99=298.34ms   max=432.09ms
+  delivery    n=399980  p50=158.82ms   p95=319.4ms    p99=405.93ms   max=718.02ms
+
+step 4: target=1300/s achieved=1300.0/s acked=25999 failed=0 retries=0 shed=0 delivered=519980/519980 (100.00%) PASS
+  send        n=25999   p50=118.9ms    p95=264.77ms   p99=343.5ms    max=518.04ms
+  delivery    n=519980  p50=192.8ms    p95=372.49ms   p99=466.31ms   max=797.97ms
+
+step 5: target=1600/s achieved=1600.0/s acked=31999 failed=0 retries=0 shed=0 delivered=639980/639980 (100.00%) FAIL (delivery p99 545ms>slo)
+  send        n=31999   p50=141.28ms   p95=311.6ms    p99=400.59ms   max=593.93ms
+  delivery    n=639980  p50=227.54ms   p95=433.67ms   p99=545.15ms   max=862.12ms
+
+scenario: members=2000 rooms=100 listeners=2000 senders=100 steps=[600 800 1000 1300 1600 2000 2500 3000] duration=20s
+capacity: 1300 msg/s (highest passing step, slo delivery p99 < 500ms)
+sends: attempted=111994 acked=111994 failed=0
+deliveries: expected=2239880 live=2239880 late=0 lost=0 (0.0000%) unacked-delivered=0
+integrity: redelivered=0 double-insert=0 reordered=0
+sync: calls=1658696 errors=0 reconnects=0
+reconnect     n=0
+initial sync  n=2000    p50=395.33ms   p95=465.62ms   p99=486.93ms   max=501.66ms

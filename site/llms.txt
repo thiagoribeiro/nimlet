@@ -1,0 +1,45 @@
+# Nimlet
+
+> Nimlet is a lightweight, self-hosted, HTTP-first messaging backend for connecting people, applications, devices, services and AI agents. It provides authentication, room-level authorization, persistent events and recoverable synchronization without requiring a full messaging platform.
+
+Canonical site: https://thiagoribeiro.github.io/nimlet/
+GitHub repository: https://github.com/thiagoribeiro/nimlet
+License: Apache-2.0
+
+## What it provides
+
+- Authenticated participants: users, devices, sessions and service identities; the server derives the sender from the authenticated session.
+- Rooms and permissions: memberships, roles, and authorization for reading and publishing events.
+- Persistent communication: append-only room events in PostgreSQL, idempotent sends, paginated history.
+- Reconnect-friendly sync: incremental `/sync` over plain HTTP with long polling and opaque cursors; clients recover missed events after disconnecting.
+- AppServices: namespace-scoped bridges for bots, AI agents and external systems.
+- Namespaces: several independent applications isolated in one deployment.
+- Optional media (filesystem or S3-compatible) and Android push notifications.
+
+## Where it fits
+
+- An embedded chat feature in an app or small SaaS.
+- A persistent conversation between users and an external AI agent, independent of the LLM or agent framework.
+- Commands and replies between a companion app and a connected device, with offline catch-up.
+- Bots and integrations that join the same rooms as people.
+
+## What it is not
+
+Not a Matrix homeserver or federation protocol, not a Slack/Mattermost/Rocket.Chat replacement, not a general-purpose message broker, not an LLM agent framework or workflow engine, not a WebSocket-first realtime server, and not an end-to-end encrypted messenger.
+
+## Stack
+
+Go server; PostgreSQL is the source of truth (migrations run at startup); Redis Pub/Sub only wakes `/sync` across instances (latency, not correctness); HMAC-signed opaque bearer tokens.
+
+## Measured (docs/benchmarks.md)
+
+- One instance on 2 cores sustains 2,500 msg/s into rooms of 20 (50k deliveries/s) at delivery p99 under 500 ms.
+- Adding and removing instances, killing an instance, and restarting Redis or Postgres under load lost, duplicated or reordered nothing across 78M checked deliveries.
+
+## Documentation
+
+- README (quick start, API overview, AppServices, sync model): https://github.com/thiagoribeiro/nimlet/blob/main/README.md
+- OpenAPI: https://github.com/thiagoribeiro/nimlet/blob/main/openapi.yaml
+- Benchmarks: https://github.com/thiagoribeiro/nimlet/blob/main/docs/benchmarks.md
+- Operations: https://github.com/thiagoribeiro/nimlet/blob/main/docs/operations.md
+- Client: NimChat, https://github.com/thiagoribeiro/nimchat
